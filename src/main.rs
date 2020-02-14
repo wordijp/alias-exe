@@ -1,5 +1,8 @@
 use std::env;
 
+#[macro_use]
+extern crate lazy_static;
+
 mod path;
 mod do_exec;
 mod do_alias;

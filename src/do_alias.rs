@@ -1,11 +1,12 @@
-use std::env;
-use std::process;
+use std::{env, process, fs, io};
 
 use clap::{
     self,
     App, Arg, SubCommand,
     crate_name, crate_authors, crate_version
 };
+
+use crate::path;
 
 pub fn run(args: &Vec<String>)  {
     let matches = clap_matches(args);
@@ -17,8 +18,8 @@ pub fn run(args: &Vec<String>)  {
     if let Some(ref matches) = matches.subcommand_matches("edit") {
         edit(matches);
     }
-    if let Some(ref matches) = matches.subcommand_matches("list") {
-        list(matches);
+    if let Some(ref _matches) = matches.subcommand_matches("list") {
+        let _ = list();
     }
 }
 
@@ -30,8 +31,20 @@ fn edit(matches: &clap::ArgMatches<'static>) {
     }
 }
 
-fn list(matches: &clap::ArgMatches<'static>) {
-    println!("list!");
+fn list() -> io::Result<()> {
+    const LISTDIR: &str = "./list";
+    for entry in fs::read_dir(LISTDIR)? {
+        let path = entry?.path();
+        
+        if path::is_exe(&path) {
+            let name = path.file_stem().unwrap().to_str().unwrap();
+            let alias = fs::read_to_string(format!("{}/{}.txt", LISTDIR, name));
+            let alias = if alias.is_ok() { alias.unwrap() } else { "".to_owned() }; 
+            println!("{}={}", name, alias.trim());
+        }
+    }
+
+    Ok(())
 }
 
 // ---
