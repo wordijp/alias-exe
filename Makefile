@@ -1,11 +1,12 @@
 TARGET	= alias.exe
 
 SRCS	= \
-	src/do_alias.rs  \
-	src/do_exec.rs   \
-	src/lib/alias.rs \
-	src/lib/mod.rs   \
-	src/lib/path.rs  \
+	src/do_alias.rs   \
+	src/do_exec.rs    \
+	src/lib/alias.rs  \
+	src/lib/encode.rs \
+	src/lib/mod.rs    \
+	src/lib/path.rs   \
 	src/main.rs
 
 ifeq ($(DEBUG), 1)
