@@ -6,7 +6,7 @@ use clap::{
     crate_name, crate_authors, crate_version
 };
 
-use crate::path;
+use crate::lib;
 
 pub fn run(args: &Vec<String>)  {
     let matches = clap_matches(args);
@@ -19,7 +19,7 @@ pub fn run(args: &Vec<String>)  {
         edit(matches);
     }
     if let Some(ref _matches) = matches.subcommand_matches("list") {
-        let _ = list();
+        list();
     }
 }
 
@@ -31,20 +31,10 @@ fn edit(matches: &clap::ArgMatches<'static>) {
     }
 }
 
-fn list() -> io::Result<()> {
-    const LISTDIR: &str = "./list";
-    for entry in fs::read_dir(LISTDIR)? {
-        let path = entry?.path();
-        
-        if path::is_exe(&path) {
-            let name = path.file_stem().unwrap().to_str().unwrap();
-            let alias = fs::read_to_string(format!("{}/{}.txt", LISTDIR, name));
-            let alias = if alias.is_ok() { alias.unwrap() } else { "".to_owned() }; 
-            println!("{}={}", name, alias.trim());
-        }
+fn list() {
+    for (key, value) in lib::alias::iter() {
+        println!("{}={}", key, value);
     }
-
-    Ok(())
 }
 
 // ---
