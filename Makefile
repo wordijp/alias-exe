@@ -5,8 +5,10 @@ SRCS	= \
 	src/do_exec.rs    \
 	src/lib/alias.rs  \
 	src/lib/encode.rs \
+	src/lib/exec.rs   \
 	src/lib/mod.rs    \
 	src/lib/path.rs   \
+	src/lib/repl.rs   \
 	src/main.rs
 
 ifeq ($(DEBUG), 1)
@@ -26,10 +28,10 @@ bin:
 
 bin/$(TARGET): target\$(MODE)\$(TARGET)
 	cp -f $< $@
-	
+
 target\$(MODE)\$(TARGET): $(SRCS)
 	cargo build $(RFLAGS)
-	
+
 clean:
 	rm -f $(TARGET)
 
