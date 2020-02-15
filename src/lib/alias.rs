@@ -1,5 +1,5 @@
 use std::{env, fs, path::Path};
-use std::io::{self, Error, ErrorKind};
+use std::io::{self, Read, Error, ErrorKind};
 use std::process::{Child, Command};
 
 use crate::lib::path;
@@ -14,6 +14,7 @@ pub struct AliasListIterator {
 }
 
 impl Iterator for AliasListIterator {
+    // type Item = (<alias_name>, <value>)
     type Item = (String, String);
 
     fn next(&mut self) -> Option<(String, String)> {
@@ -23,10 +24,14 @@ impl Iterator for AliasListIterator {
                     Ok(entry) => {
                         let path = entry.path();
                         if path::is_exe(&path) {
-                            let name = path.file_stem().unwrap().to_str().unwrap();
-                            let alias = fs::read_to_string(format!("{}/{}.txt", LISTDIR, name));
-                            let alias = if alias.is_ok() { alias.unwrap() } else { "".to_owned() };
-                            return Some((name.to_string(), alias.trim().to_string()));
+                            let alias_name = path.file_stem()
+                                .and_then(|x| x.to_str())
+                                .map(|x| x.to_string())
+                                .unwrap();
+                            let value = fs::read_to_string(format!("{}/{}.txt", LISTDIR, alias_name))
+                                .map(|x| x.trim().to_string())
+                                .unwrap_or("".to_owned());
+                            return Some((alias_name, value));
                         }
                     },
                     Err(_) => break,
@@ -50,16 +55,12 @@ pub fn edit(alias_name: &str) -> io::Result<()> {
     }
 
     let alias_txt = format!("{}/{}.txt", LISTDIR, alias_name);
-    let alias_path = Path::new(&alias_txt);
-    if !alias_path.exists() {
+    if !Path::new(&alias_txt).exists() {
         fs::File::create(&alias_txt)?;
     }
 
-    if try_edit("vim", &alias_txt).is_ok() {
-        return Ok(())
-    }
-
-    try_edit("notepad", &alias_txt)
+    try_edit("vim", &alias_txt)
+        .or_else(|_| try_edit("notepad", &alias_txt))
 }
 fn try_edit(editor: &str, alias_txt: &str) -> io::Result<()> {
     let cmd = Command::new(editor)
@@ -73,7 +74,9 @@ fn try_edit(editor: &str, alias_txt: &str) -> io::Result<()> {
 
     let status = cmd.wait()?;
     if status.code().unwrap() != 0 {
-        return Err(Error::new(ErrorKind::Other, "edit failed"));
+        let mut buf = Vec::new();
+        cmd.stderr.unwrap().read_to_end(&mut buf).unwrap();
+        return Err(Error::new(ErrorKind::Other, encode::to_utf8_string(&buf)));
     }
 
     Ok(())
@@ -83,22 +86,23 @@ fn try_edit(editor: &str, alias_txt: &str) -> io::Result<()> {
 
 pub fn mklink(alias_name: &str) -> io::Result<()> {
     let alias_exe = format!("{}/{}.exe", LISTDIR, alias_name);
-    let alias_path = Path::new(&alias_exe);
-    if !alias_path.exists() {
-        let current_exe = env::current_exe().unwrap();
-        let current_path = Path::new(&current_exe);
-
-        env::set_current_dir(&format!("{}/{}", current_path.parent().unwrap().to_str().unwrap(), LISTDIR)).unwrap();
-
-        // NOTE: mklink path separator is '\'
-        let link = format!("{}.exe", alias_name);
-        let target = format!("..\\{}", current_path.file_name().unwrap().to_str().unwrap());
-        try_mklink(&link, &target)?;
+    if Path::new(&alias_exe).exists() {
+        return Ok(());
     }
 
-    Ok(())
+    let current_exe = env::current_exe().unwrap();
+    let cwd_bak = env::current_dir().unwrap();
+
+    env::set_current_dir(&format!("{}/{}", current_exe.parent().unwrap().display(), LISTDIR)).expect("failed: change current dir");
+    // NOTE: mklink path separator is '\'
+    let link = format!("{}.exe", alias_name);
+    let target = format!("..\\{}", current_exe.file_name().unwrap().to_str().unwrap());
+    let ret = try_mklink(&link, &target);
+    env::set_current_dir(cwd_bak).expect("failed: restore current dir");
+
+    ret
 }
-pub fn try_mklink(link: &str, target: &str) -> io::Result<()> {
+fn try_mklink(link: &str, target: &str) -> io::Result<()> {
     let output = Command::new("cmd")
         .arg("/c")
         .arg("mklink")

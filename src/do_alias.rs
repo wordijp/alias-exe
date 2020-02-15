@@ -1,5 +1,4 @@
 use std::{env, process, io};
-use std::path::Path;
 
 use clap::{
     self,
@@ -11,9 +10,8 @@ use crate::lib;
 
 pub fn run(args: &Vec<String>) {
     // current directory to exe dir
-    let cwd = env::current_exe().unwrap();
-    let path = Path::new(&cwd);
-    env::set_current_dir(path.parent().unwrap()).expect("failed: change current dir");
+    let current_exe = env::current_exe().unwrap();
+    env::set_current_dir(current_exe.parent().unwrap()).expect("failed: change current dir");
 
     if let Err(err) = try_run(args) {
         eprintln!("{}", err);
@@ -39,9 +37,9 @@ fn try_run(args: &Vec<String>) -> io::Result<()> {
 }
 
 fn edit(matches: &clap::ArgMatches<'static>) -> io::Result<()> {
-    if let Some(name) = matches.value_of("alias_name") {
-        lib::alias::edit(name)?;
-        lib::alias::mklink(name)?;
+    if let Some(alias_name) = matches.value_of("alias_name") {
+        lib::alias::edit(alias_name)?;
+        lib::alias::mklink(alias_name)?;
     }
     Ok(())
 }

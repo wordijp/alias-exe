@@ -1,13 +1,9 @@
-use std::{env, fs};
-use std::path::{self, Path};
+use std::{env, fs, path};
 
 use regex::Regex;
 
 pub fn self_is_symlink() -> bool {
-    let cwd = env::current_exe().unwrap();
-    let path = Path::new(cwd.to_str().unwrap());
-
-    path.read_link().is_ok()
+    env::current_exe().unwrap().read_link().is_ok()
 }
 
 lazy_static! {
@@ -15,6 +11,5 @@ lazy_static! {
 }
 
 pub fn is_exe(path: &path::PathBuf) -> bool {
-    let meta = fs::metadata(path);
-    meta.is_ok() && meta.unwrap().is_file() && RE_EXE.is_match(path.to_str().unwrap())
+    RE_EXE.is_match(path.to_str().unwrap()) && fs::metadata(path).unwrap().is_file()
 }
