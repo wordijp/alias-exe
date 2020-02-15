@@ -29,6 +29,9 @@ fn try_run(args: &Vec<String>) -> io::Result<()> {
     if let Some(ref matches) = matches.subcommand_matches("edit") {
         edit(matches)?;
     }
+    if let Some(ref matches) = matches.subcommand_matches("remove") {
+        remove(matches)?;
+    }
     if let Some(ref _matches) = matches.subcommand_matches("list") {
         list();
     }
@@ -40,6 +43,14 @@ fn edit(matches: &clap::ArgMatches<'static>) -> io::Result<()> {
     if let Some(alias_name) = matches.value_of("alias_name") {
         lib::alias::edit(alias_name)?;
         lib::alias::mklink(alias_name)?;
+    }
+    Ok(())
+}
+
+fn remove(matches: &clap::ArgMatches<'static>) -> io::Result<()> {
+    if let Some(alias_name) = matches.value_of("alias_name") {
+        lib::alias::remove(alias_name)?;
+        println!("{} removed", alias_name);
     }
     Ok(())
 }
@@ -58,6 +69,7 @@ const USAGE: &str = "\
 SUBCOMMAND:
     help    Prints help information
     edit    Edit alias, new or existing
+    remove  Remove alias
     list    List aliases";
 
 const TEMPLATE: &str = "\
@@ -78,6 +90,10 @@ fn clap_matches(args: &Vec<String>) -> clap::ArgMatches<'static> {
         .template(TEMPLATE)
         .subcommand(
             SubCommand::with_name("edit")
+                .arg(Arg::from_usage("<alias_name> 'alias exe name'"))
+        )
+        .subcommand(
+            SubCommand::with_name("remove")
                 .arg(Arg::from_usage("<alias_name> 'alias exe name'"))
         )
         .subcommand(SubCommand::with_name("list"))

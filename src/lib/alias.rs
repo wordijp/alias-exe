@@ -116,3 +116,21 @@ fn try_mklink(link: &str, target: &str) -> io::Result<()> {
 
     Ok(())
 }
+
+// -----
+
+pub fn remove(alias_name: &str) -> io::Result<()> {
+    let alias_exe = format!("{}/{}.exe", LISTDIR, alias_name);
+    if !Path::new(&alias_exe).exists() {
+        return Err(Error::new(ErrorKind::NotFound, format!("failed: {}.exe is not found", alias_name)));
+    }
+
+    fs::remove_file(&alias_exe)?;
+
+    let alias_txt = format!("{}/{}.txt", LISTDIR, alias_name);
+    if Path::new(&alias_txt).exists() {
+        fs::remove_file(&alias_txt)?;
+    }
+
+    Ok(())
+}
