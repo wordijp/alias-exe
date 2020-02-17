@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, env};
 use std::io::{self, Error, ErrorKind};
 use std::process::{Child, Command};
 
@@ -10,26 +10,73 @@ pub fn read(listdir: &str, alias_name: &str) -> io::Result<String> {
     fs::read_to_string(format!("{}/{}.txt", listdir, alias_name))
 }
 
-pub fn run(alias_value: &str, args: &Vec<String>) -> io::Result<i32> {
-    let parsed_alias_value = parse_alias_value(alias_value, args)?;
-
-    let mut cmd: Child = Command::new("cmd")
-        .arg("/c")
-        .arg(parsed_alias_value)
-        .spawn()?;
-
-    let status = cmd.wait()?;
-    Ok(status.code().unwrap())
+enum Alias<'a> {
+    SetEnv(&'a str, &'a str),
+    Cmd(&'a str),
 }
 
-fn parse_alias_value(alias_value: &str, args: &Vec<String>) -> io::Result<String> {
+pub fn run(alias_value: &str, args: &Vec<String>) -> io::Result<i32> {
+    for value_line in parse_alias_value(alias_value, args)? {
+        match parse_alias_type(&value_line)? {
+            Alias::SetEnv(key, value) => env::set_var(key, value),
+            Alias::Cmd(value) => {
+                let mut cmd: Child = Command::new("cmd")
+                    .arg("/c")
+                    .arg(value)
+                    .spawn()?;
+
+                let status = cmd.wait()?;
+                let status_code = status.code().unwrap();
+                if status_code != 0 {
+                    return Ok(status_code);
+                }
+            }
+        }
+    }
+
+    Ok(0)
+}
+
+fn parse_alias_value(alias_value: &str, args: &Vec<String>) -> io::Result<Vec<String>> {
+    // parse args($1, $2, etc)
     lazy_static! {
         static ref RE_ARGS: Regex = Regex::new(r#"(\$[0-9*@#]|"\$[*@]")"#).unwrap();
     }
     let repl = repl::replace_all_func(&RE_ARGS, alias_value, |x| parse_arg(x, args))?;
+    // replace multiple line
     let repl = repl.replace("^\n", "");
+    // split multiple command
+    let repls: Vec<String> = repl
+        .split('\n')
+        .map(|x| x.trim())
+        .filter(|x| x.len() > 0)
+        .map(|x| x.to_string())
+        .collect();
 
-    Ok(repl)
+    Ok(repls)
+}
+
+fn parse_alias_type(alias_value: &str) -> io::Result<Alias> {
+    lazy_static! {
+        static ref RE_PRE_ENV: Regex = Regex::new(r"^\s*@set").unwrap();
+        static ref RE_ENV: Regex = Regex::new(r"^\s*@set\s+([^=]+)=(.*)").unwrap();
+    }
+
+    if RE_PRE_ENV.is_match(alias_value) {
+        let caps = RE_ENV.captures(alias_value);
+        if caps.is_none() {
+            return Err(Error::new(ErrorKind::InvalidData, "failed: illetal @set format"));
+        }
+
+        let caps = caps.unwrap();
+        let key = caps.get(1).unwrap().as_str();
+        let value = caps.get(2).unwrap().as_str();
+
+        Ok(Alias::SetEnv(key, value))
+    } else {
+        // TODO: parse inner command
+        Ok(Alias::Cmd(alias_value))
+    }
 }
 
 fn parse_arg(arg: &str, args: &Vec<String>) -> io::Result<String> {
