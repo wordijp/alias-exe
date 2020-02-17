@@ -27,6 +27,7 @@ fn parse_alias_value(alias_value: &str, args: &Vec<String>) -> io::Result<String
         static ref RE_ARGS: Regex = Regex::new(r#"(\$[0-9*@#]|"\$[*@]")"#).unwrap();
     }
     let repl = repl::replace_all_func(&RE_ARGS, alias_value, |x| parse_arg(x, args))?;
+    let repl = repl.replace("^\n", "");
 
     Ok(repl)
 }
