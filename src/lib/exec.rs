@@ -1,11 +1,10 @@
 use std::{fs, env};
 use std::io::{self, Error, ErrorKind};
-use std::process::{Child, Command};
 
 use regex::Regex;
 
 use crate::lib::repl;
-use crate::lib::encode;
+use crate::lib::cmd;
 
 pub fn read(listdir: &str, alias_name: &str) -> io::Result<String> {
     fs::read_to_string(format!("{}/{}.txt", listdir, alias_name))
@@ -21,15 +20,9 @@ pub fn run(alias_value: &str, args: &Vec<String>) -> io::Result<i32> {
         match parse_alias_type(&value_line)? {
             Alias::SetEnv(key, value) => env::set_var(key, value),
             Alias::Cmd(value) => {
-                let mut cmd: Child = Command::new("cmd")
-                    .arg("/c")
-                    .arg(value)
-                    .spawn()?;
-
-                let status = cmd.wait()?;
-                let status_code = status.code().unwrap();
+                let status_code = cmd::command_spawn(&value)?;
                 if status_code != 0 {
-                    return Ok(status_code);
+                    return Err(Error::new(ErrorKind::Interrupted, format!("failed: status_code {}", status_code)));
                 }
             }
         }
@@ -78,22 +71,9 @@ fn parse_alias_type(alias_value: &str) -> io::Result<Alias> {
         Ok(Alias::SetEnv(key, value))
     } else {
         let value = repl::replace_all_func_nested(&RE_NESTED_CMD, alias_value,
-            |caps| command_output(caps.get(1).unwrap().as_str()))?;
+            |caps| cmd::command_output(caps.get(1).unwrap().as_str()))?;
         Ok(Alias::Cmd(value))
     }
-}
-
-fn command_output(cmd: &str) -> io::Result<String> {
-    let output = Command::new("cmd")
-        .arg("/c")
-        .arg(cmd)
-        .output()?;
-
-    if !output.status.success() {
-        return Err(Error::new(ErrorKind::InvalidData, encode::to_utf8_string(&output.stderr)));
-    }
-
-    Ok(encode::to_utf8_string(&output.stdout).trim().to_string())
 }
 
 fn parse_arg(arg: &str, args: &Vec<String>) -> io::Result<String> {

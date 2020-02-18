@@ -4,6 +4,7 @@ SRCS	= \
 	src/do_alias.rs   \
 	src/do_exec.rs    \
 	src/lib/alias.rs  \
+	src/lib/cmd.rs    \
 	src/lib/encode.rs \
 	src/lib/exec.rs   \
 	src/lib/mod.rs    \
