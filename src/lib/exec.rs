@@ -5,6 +5,7 @@ use std::process::{Child, Command};
 use regex::Regex;
 
 use crate::lib::repl;
+use crate::lib::encode;
 
 pub fn read(listdir: &str, alias_name: &str) -> io::Result<String> {
     fs::read_to_string(format!("{}/{}.txt", listdir, alias_name))
@@ -12,7 +13,7 @@ pub fn read(listdir: &str, alias_name: &str) -> io::Result<String> {
 
 enum Alias<'a> {
     SetEnv(&'a str, &'a str),
-    Cmd(&'a str),
+    Cmd(String),
 }
 
 pub fn run(alias_value: &str, args: &Vec<String>) -> io::Result<i32> {
@@ -42,7 +43,7 @@ fn parse_alias_value(alias_value: &str, args: &Vec<String>) -> io::Result<Vec<St
     lazy_static! {
         static ref RE_ARGS: Regex = Regex::new(r#"(\$[0-9*@#]|"\$[*@]")"#).unwrap();
     }
-    let repl = repl::replace_all_func(&RE_ARGS, alias_value, |x| parse_arg(x, args))?;
+    let repl = repl::replace_all_func_nested(&RE_ARGS, alias_value, |caps| parse_arg(caps.get(0).unwrap().as_str(), args))?;
     // replace multiple line
     let repl = repl.replace("^\n", "");
     // split multiple command
@@ -60,6 +61,8 @@ fn parse_alias_type(alias_value: &str) -> io::Result<Alias> {
     lazy_static! {
         static ref RE_PRE_ENV: Regex = Regex::new(r"^\s*@set").unwrap();
         static ref RE_ENV: Regex = Regex::new(r"^\s*@set\s+([^=]+)=(.*)").unwrap();
+
+        static ref RE_NESTED_CMD: Regex = Regex::new(r"\$\((.*?)\)").unwrap();
     }
 
     if RE_PRE_ENV.is_match(alias_value) {
@@ -74,9 +77,23 @@ fn parse_alias_type(alias_value: &str) -> io::Result<Alias> {
 
         Ok(Alias::SetEnv(key, value))
     } else {
-        // TODO: parse inner command
-        Ok(Alias::Cmd(alias_value))
+        let value = repl::replace_all_func_nested(&RE_NESTED_CMD, alias_value,
+            |caps| command_output(caps.get(1).unwrap().as_str()))?;
+        Ok(Alias::Cmd(value))
     }
+}
+
+fn command_output(cmd: &str) -> io::Result<String> {
+    let output = Command::new("cmd")
+        .arg("/c")
+        .arg(cmd)
+        .output()?;
+
+    if !output.status.success() {
+        return Err(Error::new(ErrorKind::InvalidData, encode::to_utf8_string(&output.stderr)));
+    }
+
+    Ok(encode::to_utf8_string(&output.stdout).trim().to_string())
 }
 
 fn parse_arg(arg: &str, args: &Vec<String>) -> io::Result<String> {
