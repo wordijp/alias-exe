@@ -4,6 +4,7 @@ use std::process::{Child, Command};
 
 use crate::lib::path;
 use crate::lib::encode;
+use crate::lib::term;
 
 const LISTDIR: &str = "./list";
 
@@ -67,7 +68,7 @@ fn try_edit(editor: &str, alias_txt: &str) -> io::Result<()> {
         .arg(alias_txt)
         .spawn();
     if let Err(err) = cmd {
-        return Err(Error::new(ErrorKind::NotFound, format!("Not found {}\n{}", editor, err)));
+        return Err(Error::new(ErrorKind::NotFound, format!("{} {}\n{}", term::ewrite("Not found")?, editor, err)));
     }
 
     let mut cmd: Child = cmd.unwrap();
@@ -93,12 +94,12 @@ pub fn mklink(alias_name: &str) -> io::Result<()> {
     let current_exe = env::current_exe().unwrap();
     let cwd_bak = env::current_dir().unwrap();
 
-    env::set_current_dir(&format!("{}/{}", current_exe.parent().unwrap().display(), LISTDIR)).expect("failed: change current dir");
+    env::set_current_dir(&format!("{}/{}", current_exe.parent().unwrap().display(), LISTDIR)).expect(&format!("{}: change current dir", term::ewrite("failed")?));
     // NOTE: mklink path separator is '\'
     let link = format!("{}.exe", alias_name);
     let target = format!("..\\{}", current_exe.file_name().unwrap().to_str().unwrap());
     let ret = try_mklink(&link, &target);
-    env::set_current_dir(cwd_bak).expect("failed: restore current dir");
+    env::set_current_dir(cwd_bak).expect(&format!("{}: restore current dir", term::ewrite("failed")?));
 
     ret
 }
@@ -122,7 +123,7 @@ fn try_mklink(link: &str, target: &str) -> io::Result<()> {
 pub fn remove(alias_name: &str) -> io::Result<()> {
     let alias_exe = format!("{}/{}.exe", LISTDIR, alias_name);
     if !Path::new(&alias_exe).exists() {
-        return Err(Error::new(ErrorKind::NotFound, format!("failed: {}.exe is not found", alias_name)));
+        return Err(Error::new(ErrorKind::NotFound, format!("{}: {}.exe is not found", term::ewrite("failed")?, alias_name)));
     }
 
     fs::remove_file(&alias_exe)?;

@@ -10,6 +10,7 @@ SRCS	= \
 	src/lib/mod.rs    \
 	src/lib/path.rs   \
 	src/lib/repl.rs   \
+	src/lib/term.rs   \
 	src/main.rs
 
 ifeq ($(DEBUG), 1)

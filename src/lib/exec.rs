@@ -5,6 +5,7 @@ use regex::Regex;
 
 use crate::lib::repl;
 use crate::lib::cmd;
+use crate::lib::term;
 
 pub fn read(listdir: &str, alias_name: &str) -> io::Result<String> {
     fs::read_to_string(format!("{}/{}.txt", listdir, alias_name))
@@ -19,12 +20,7 @@ pub fn run(alias_value: &str, args: &Vec<String>) -> io::Result<i32> {
     for value_line in parse_alias_value(alias_value, args)? {
         match parse_alias_type(&value_line)? {
             Alias::SetEnv(key, value) => env::set_var(key, value),
-            Alias::Cmd(value) => {
-                let status_code = cmd::command_spawn(&value)?;
-                if status_code != 0 {
-                    return Err(Error::new(ErrorKind::Interrupted, format!("failed: status_code {}", status_code)));
-                }
-            }
+            Alias::Cmd(value) => cmd::command_spawn(&value)?,
         }
     }
 
@@ -36,7 +32,7 @@ fn parse_alias_value(alias_value: &str, args: &Vec<String>) -> io::Result<Vec<St
     lazy_static! {
         static ref RE_ARGS: Regex = Regex::new(r#"(\$[0-9*@#]|"\$[*@]")"#).unwrap();
     }
-    let repl = repl::replace_all_func_nested(&RE_ARGS, alias_value, |caps| parse_arg(caps.get(0).unwrap().as_str(), args))?;
+    let repl = repl::replace_all_func(&RE_ARGS, alias_value, |caps| parse_arg(caps.get(0).unwrap().as_str(), args))?;
     // replace multiple line
     let repl = repl.replace("^\n", "");
     // split multiple command
@@ -61,7 +57,8 @@ fn parse_alias_type(alias_value: &str) -> io::Result<Alias> {
     if RE_PRE_ENV.is_match(alias_value) {
         let caps = RE_ENV.captures(alias_value);
         if caps.is_none() {
-            return Err(Error::new(ErrorKind::InvalidData, "failed: illetal @set format"));
+            let (s1, s2, s3) = repl::partition_re(&RE_PRE_ENV, alias_value).unwrap();
+            return Err(Error::new(ErrorKind::InvalidData, format!("{}: illegal @set format\n{}{}{}", term::ewrite("failed")?, s1, term::ewrite(s2)?, s3)));
         }
 
         let caps = caps.unwrap();
@@ -89,8 +86,8 @@ fn parse_arg(arg: &str, args: &Vec<String>) -> io::Result<String> {
         "$8" => Ok(if args.len() > 8 { args[8].clone() } else { "".to_owned() }),
         "$9" => Ok(if args.len() > 9 { args[9].clone() } else { "".to_owned() }),
         "$#" => Ok(format!("{}", args.len() - 1)),
-        "$*" => Err(Error::new(ErrorKind::InvalidData, "failed: $* is not suppurted, maybe \"$*\" ?")),
-        "$@" => Err(Error::new(ErrorKind::InvalidData, "failed: $@ is not suppurted, maybe \"$@\" ?")),
+        "$*" => Err(Error::new(ErrorKind::InvalidData, format!("{}: $* is not supported, maybe \"$*\" ?", term::ewrite("failed")?))),
+        "$@" => Err(Error::new(ErrorKind::InvalidData, format!("{}: $@ is not supported, maybe \"$@\" ?", term::ewrite("failed")?))),
         "\"$*\"" => Ok(str_join(args.iter().skip(1), " ")),
         "\"$@\"" => Ok(str_join(args.iter().skip(1), " ")),
         _ => Ok(arg.to_string()),

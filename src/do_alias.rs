@@ -7,11 +7,12 @@ use clap::{
 };
 
 use crate::lib;
+use crate::lib::term;
 
 pub fn run(args: &Vec<String>) {
     // current directory to exe dir
     let current_exe = env::current_exe().unwrap();
-    env::set_current_dir(current_exe.parent().unwrap()).expect("failed: change current dir");
+    env::set_current_dir(current_exe.parent().unwrap()).expect(&format!("{}: change current dir", term::ewrite("failed").unwrap()));
 
     if let Err(err) = try_run(args) {
         eprintln!("{}", err);
@@ -33,7 +34,7 @@ fn try_run(args: &Vec<String>) -> io::Result<()> {
         remove(matches)?;
     }
     if let Some(ref _matches) = matches.subcommand_matches("list") {
-        list();
+        list()?;
     }
 
     Ok(())
@@ -50,15 +51,17 @@ fn edit(matches: &clap::ArgMatches<'static>) -> io::Result<()> {
 fn remove(matches: &clap::ArgMatches<'static>) -> io::Result<()> {
     if let Some(alias_name) = matches.value_of("alias_name") {
         lib::alias::remove(alias_name)?;
-        println!("{} removed", alias_name);
+        println!("{} removed", term::keywrite(alias_name)?);
     }
     Ok(())
 }
 
-fn list() {
+fn list() -> io::Result<()> {
     for (key, value) in lib::alias::iter() {
-        println!("{}={}", key, value);
+        print!("{}", term::keywrite(&key)?);
+        println!(":\n{}", value);
     }
+    Ok(())
 }
 
 // ---
