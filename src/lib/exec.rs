@@ -67,10 +67,54 @@ fn parse_alias_type(alias_value: &str) -> io::Result<Alias> {
 
         Ok(Alias::SetEnv(key, value))
     } else {
+        validate_nested_cmd(alias_value)?;
+
         let value = repl::replace_all_func_nested(&RE_NESTED_CMD, alias_value,
             |caps| cmd::command_output(caps.get(1).unwrap().as_str()))?;
         Ok(Alias::Cmd(value))
     }
+}
+
+fn validate_nested_cmd(alias_value: &str) -> io::Result<()> {
+    lazy_static! {
+        static ref RE_NESTED_CMD: Regex = Regex::new(r"(\$\(|\))").unwrap();
+    }
+
+    let mut nested: Vec<(usize, usize)> = Vec::new();
+    let mut erred: Vec<(usize, usize)> = Vec::new();
+
+    for caps in RE_NESTED_CMD.captures_iter(alias_value) {
+        let elm = caps.get(0).unwrap();
+        match elm.as_str() {
+            "$(" => nested.push((elm.start(), elm.end())),
+            ")" => {
+                if nested.pop().is_none() {
+                    erred.push((elm.start(), elm.end()));
+                }
+            },
+            _ => {},
+        }
+    }
+
+    if nested.len() > 0 || erred.len() > 0 {
+        nested.append(&mut erred);
+        nested.sort_by(|a, b| a.0.cmp(&b.0));
+
+        // Colorize error location
+        let mut s = String::new();
+        let mut idx = 0;
+        for (start, end) in nested {
+            s.push_str(&alias_value[idx..start]);
+            s.push_str(&term::ewrite(&alias_value[start..end])?);
+            idx = end;
+        }
+        if idx < alias_value.len() {
+            s.push_str(&alias_value[idx..]);
+        }
+        return Err(Error::new(ErrorKind::InvalidData, format!("{}: nested command syntax error\n\n{}", term::ewrite("failed")?, s)));
+    }
+
+    Ok(())
 }
 
 fn parse_arg(arg: &str, args: &Vec<String>) -> io::Result<String> {
