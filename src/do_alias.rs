@@ -42,6 +42,7 @@ fn try_run(args: &Vec<String>) -> io::Result<()> {
 
 fn edit(matches: &clap::ArgMatches<'static>) -> io::Result<()> {
     if let Some(alias_name) = matches.value_of("alias_name") {
+        lib::alias::validate(alias_name)?;
         lib::alias::edit(alias_name)?;
         lib::alias::mklink(alias_name)?;
     }

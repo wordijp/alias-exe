@@ -50,6 +50,20 @@ pub fn iter() -> AliasListIterator {
 
 // -----
 
+pub fn validate(alias_name: &str) -> io::Result<()> {
+    let orig_name = env::current_exe().unwrap()
+        .file_stem()
+        .and_then(|x| x.to_str())
+        .map(|x| x.to_string())
+        .unwrap();
+    if alias_name.eq(&orig_name) {
+        return Err(Error::new(ErrorKind::InvalidData, format!("{}: original name is invalid: {}", term::ewrite("failed")?, term::ewrite(&orig_name)?)));
+    }
+    Ok(())
+}
+
+// -----
+
 pub fn edit(alias_name: &str) -> io::Result<()> {
     if !Path::new(LISTDIR).exists() {
         fs::create_dir(LISTDIR)?;
