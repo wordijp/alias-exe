@@ -48,8 +48,8 @@ fn parse_alias_value(alias_value: &str, args: &Vec<String>) -> io::Result<Vec<St
 
 fn parse_alias_type(alias_value: &str) -> io::Result<Alias> {
     lazy_static! {
-        static ref RE_PRE_ENV: Regex = Regex::new(r"^\s*@set").unwrap();
-        static ref RE_ENV: Regex = Regex::new(r"^\s*@set\s+([^=]+)=(.*)").unwrap();
+        static ref RE_PRE_ENV: Regex = Regex::new(r"^@set").unwrap();
+        static ref RE_ENV: Regex = Regex::new(r"^@set\s+([^=]+)=(.*)").unwrap();
 
         static ref RE_NESTED_CMD: Regex = Regex::new(r"\$\((.*?)\)").unwrap();
     }
