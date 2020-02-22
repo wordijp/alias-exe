@@ -82,7 +82,7 @@ fn try_edit(editor: &str, alias_txt: &str) -> io::Result<()> {
         .arg(alias_txt)
         .spawn();
     if let Err(err) = cmd {
-        return Err(Error::new(ErrorKind::NotFound, format!("{} {}\n{}", term::ewrite("Not found")?, editor, err)));
+        return Err(Error::new(ErrorKind::NotFound, format!("{}: Not found {}\n\n{}", term::ewrite("failed")?, editor, err)));
     }
 
     let mut cmd: Child = cmd.unwrap();

@@ -22,7 +22,7 @@ pub fn replace_all_func(
         }
         let rep = frep(&m);
         if let Err(err) = rep {
-            return Err(Error::new(ErrorKind::InvalidData, format!("{}\n{}{}{}", err, &text[..start], term::ewrite(elm.as_str())?, &text[elm.end()..])));
+            return Err(Error::new(ErrorKind::InvalidData, format!("{}\n\n{}{}{}", format!("{}", err).trim(), &text[..start], term::ewrite(elm.as_str())?, &text[elm.end()..])));
         }
 
         s.push_str(&rep.unwrap());
@@ -52,7 +52,7 @@ pub fn replace_all_func_nested(
 
         let rep = frep(&re.captures(s2).unwrap());
         if let Err(err) = rep {
-            return Err(Error::new(ErrorKind::InvalidData, format!("{}\n{}{}{}", err, s1, term::ewrite(s2)?, s3)));
+            return Err(Error::new(ErrorKind::InvalidData, format!("{}\n\n{}{}{}", format!("{}", err).trim(), s1, term::ewrite(s2)?, s3)));
         }
 
         s = format!("{}{}{}", s1, &rep.unwrap(), s3);

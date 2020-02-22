@@ -58,7 +58,7 @@ fn parse_alias_type(alias_value: &str) -> io::Result<Alias> {
         let caps = RE_ENV.captures(alias_value);
         if caps.is_none() {
             let (s1, s2, s3) = repl::partition_re(&RE_PRE_ENV, alias_value).unwrap();
-            return Err(Error::new(ErrorKind::InvalidData, format!("{}: illegal @set format\n{}{}{}", term::ewrite("failed")?, s1, term::ewrite(s2)?, s3)));
+            return Err(Error::new(ErrorKind::InvalidData, format!("{}: illegal @set format\n\n{}{}{}", term::ewrite("failed")?, s1, term::ewrite(s2)?, s3)));
         }
 
         let caps = caps.unwrap();
