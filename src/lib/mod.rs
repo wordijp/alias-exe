@@ -5,3 +5,4 @@ pub mod encode;
 pub mod repl;
 pub mod cmd;
 pub mod term;
+pub mod dsl;

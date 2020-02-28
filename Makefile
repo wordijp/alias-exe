@@ -1,16 +1,18 @@
 TARGET	= alias.exe
 
 SRCS	= \
-	src/do_alias.rs   \
-	src/do_exec.rs    \
-	src/lib/alias.rs  \
-	src/lib/cmd.rs    \
-	src/lib/encode.rs \
-	src/lib/exec.rs   \
-	src/lib/mod.rs    \
-	src/lib/path.rs   \
-	src/lib/repl.rs   \
-	src/lib/term.rs   \
+	src/do_alias.rs      \
+	src/do_exec.rs       \
+	src/lib/alias.rs     \
+	src/lib/cmd.rs       \
+	src/lib/dsl/mod.rs   \
+	src/lib/dsl/mruby.rs \
+	src/lib/encode.rs    \
+	src/lib/exec.rs      \
+	src/lib/mod.rs       \
+	src/lib/path.rs      \
+	src/lib/repl.rs      \
+	src/lib/term.rs      \
 	src/main.rs
 
 ifeq ($(DEBUG), 1)
