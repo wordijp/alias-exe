@@ -11,23 +11,30 @@ pub fn read(listdir: &str, alias_name: &str) -> io::Result<String> {
     fs::read_to_string(format!("{}/{}.txt", listdir, alias_name))
 }
 
-enum Alias<'a> {
+enum Parsed<'a> {
     SetEnv(&'a str, &'a str),
     Cmd(String),
 }
 
 pub fn run(alias_value: &str, args: &Vec<String>) -> io::Result<i32> {
-    for value_line in parse_alias_value(alias_value, args)? {
-        match parse_alias_type(&value_line)? {
-            Alias::SetEnv(key, value) => env::set_var(key, value),
-            Alias::Cmd(value) => cmd::command_spawn(&value)?,
+    parse_alias_value(alias_value, args, |parsed| {
+        match parsed {
+            Parsed::SetEnv(key, value) => env::set_var(key, value),
+            Parsed::Cmd(value) => cmd::command_spawn(&value)?,
         }
-    }
+        Ok(())
+    })?;
 
     Ok(0)
 }
 
-fn parse_alias_value(alias_value: &str, args: &Vec<String>) -> io::Result<Vec<String>> {
+fn parse_alias_value(
+    alias_value: &str,
+    args: &Vec<String>,
+    frun: impl Fn(Parsed) -> io::Result<()>
+)
+    -> io::Result<()>
+{
     // parse args($1, $2, etc)
     lazy_static! {
         static ref RE_ARGS: Regex = Regex::new(r#"(\$[0-9*@#]|"\$[*@]")"#).unwrap();
@@ -36,17 +43,18 @@ fn parse_alias_value(alias_value: &str, args: &Vec<String>) -> io::Result<Vec<St
     // replace multiple line
     let repl = repl.replace("^\n", "");
     // split multiple command
-    let repls: Vec<String> = repl
-        .split('\n')
+    for alias_value in repl.split('\n')
         .map(|x| x.trim())
         .filter(|x| x.len() > 0)
-        .map(|x| x.to_string())
-        .collect();
+    {
+        // and run
+        frun(parse_alias_type(alias_value)?)?;
+    }
 
-    Ok(repls)
+    Ok(())
 }
 
-fn parse_alias_type(alias_value: &str) -> io::Result<Alias> {
+fn parse_alias_type(alias_value: &str) -> io::Result<Parsed> {
     lazy_static! {
         static ref RE_PRE_ENV: Regex = Regex::new(r"^@set").unwrap();
         static ref RE_ENV: Regex = Regex::new(r"^@set\s+([^=]+)=(.*)").unwrap();
@@ -65,13 +73,13 @@ fn parse_alias_type(alias_value: &str) -> io::Result<Alias> {
         let key = caps.get(1).unwrap().as_str();
         let value = caps.get(2).unwrap().as_str();
 
-        Ok(Alias::SetEnv(key, value))
+        Ok(Parsed::SetEnv(key, value))
     } else {
         validate_nested_cmd(alias_value)?;
 
         let value = repl::replace_all_func_nested(&RE_NESTED_CMD, alias_value,
             |caps| cmd::command_output(caps.get(1).unwrap().as_str()))?;
-        Ok(Alias::Cmd(value))
+        Ok(Parsed::Cmd(value))
     }
 }
 
