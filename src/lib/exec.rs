@@ -1,4 +1,4 @@
-use std::{fs, env};
+use std::{fs, env, ops};
 use std::io::{self, Error, ErrorKind};
 
 use regex::Regex;
@@ -7,7 +7,7 @@ use mrusty::*;
 use crate::lib::repl;
 use crate::lib::cmd;
 use crate::lib::term;
-use crate::lib::dsl::mruby;
+use crate::lib::dsl;
 
 pub fn read(listdir: &str, alias_name: &str) -> io::Result<String> {
     fs::read_to_string(format!("{}/{}.txt", listdir, alias_name))
@@ -24,13 +24,13 @@ pub fn run(alias_value: &str, args: &Vec<String>) -> io::Result<i32> {
     //lazy_static! {
     //    static ref MRUBY: mrusty::MrubyType = mruby::mruby_new().unwrap();
     //}
-    let mruby = mruby::mruby_new().unwrap();
+    let mruby = dsl::mruby::mruby_new().unwrap();
 
-    parse_alias_value(alias_value, args, |parsed| {
+    parse_alias_value(alias_value, args, &mruby, |parsed| {
         match parsed {
             Parsed::SetEnv(key, value) => env::set_var(key, value),
-            Parsed::Cmd(value) => cmd::command_spawn(&value)?,
-            Parsed::Mruby(source) => mruby_run(&mruby, source)?,
+            Parsed::Cmd(source) => cmd::command_spawn(source)?,
+            Parsed::Mruby(source) => { mruby_run(&mruby, source)?; },
         }
         Ok(())
     })?;
@@ -38,45 +38,63 @@ pub fn run(alias_value: &str, args: &Vec<String>) -> io::Result<i32> {
     Ok(0)
 }
 
-fn mruby_run(mruby: &mrusty::MrubyType, source: &str) -> io::Result<()> {
-    if let Err(err) = mruby.run(source) {
+fn mruby_run(mruby: &mrusty::MrubyType, source: &str) -> io::Result<mrusty::Value> {
+    let result = mruby.run(source);
+    if let Err(err) = result {
         return Err(Error::new(ErrorKind::InvalidData, format!("{}: {}\n\n{}", term::ewrite("mruby failed")?, err, source)));
     }
-    Ok(())
+    Ok(result.unwrap())
 }
 
 fn parse_alias_value(
     alias_value: &str,
     args: &Vec<String>,
+    mruby: &mrusty::MrubyType,
     frun: impl Fn(Parsed) -> io::Result<()>
 )
     -> io::Result<()>
 {
+    const NESTED_CMD: &'static str = r"\$\((.*?)\)";
+    const NESTED_MRUBY: &'static str = r"<%=(.*?)%>";
     lazy_static! {
         // parse args($1, $2, etc)
         static ref RE_ARGS: Regex = Regex::new(r#"(\$[0-9*@#]|"\$[*@]")"#).unwrap();
-        // parse nested command( $( ... ) )
-        static ref RE_NESTED_CMD: Regex = Regex::new(r"\$\((.*?)\)").unwrap();
+        // parse nested $( ... ) or <%= ... %>
+        static ref RE_NESTED_CMD: Regex = Regex::new(NESTED_CMD).unwrap();
+        static ref RE_NESTED_MRUBY: Regex = Regex::new(NESTED_MRUBY).unwrap();
+        static ref RE_NESTED: Regex = Regex::new(&format!("{}|{}", NESTED_CMD, NESTED_MRUBY)).unwrap();
     }
     let alias_value = repl::replace_all_func(&RE_ARGS, alias_value, |caps| parse_arg(caps.get(0).unwrap().as_str(), args))?;
 
     // replace multiple line for cmd
     let alias_value = alias_value.replace("^\n", "");
 
+    let run_nested = |caps: &regex::Captures| {
+        let s = caps.get(0).unwrap().as_str();
+        if &s[0..2] == "$(" {
+            // nested cmd
+            let cap = RE_NESTED_CMD.captures(&s).unwrap();
+            let source = cap.get(1).unwrap().as_str();
+            cmd::command_output(source)
+        } else {
+            // nested mruby
+            let cap = RE_NESTED_MRUBY.captures(&s).unwrap();
+            let source = cap.get(1).unwrap().as_str();
+            let value = mruby_run(mruby, source)?;
+            dsl::mruby::value2str(mruby, value)
+        }
+    };
+
     split_source_func(&alias_value, |source| {
         match source {
             Source::Cmd(cmd_source) => {
-                // TODO: Support <%= %>
-                validate_nested_cmd(cmd_source)?;
-                let cmd_source = repl::replace_all_func_nested(&RE_NESTED_CMD, cmd_source,
-                    |caps| cmd::command_output(caps.get(1).unwrap().as_str()))?;
+                validate_nested(cmd_source)?;
+                let cmd_source = repl::replace_all_func_nested(&RE_NESTED, cmd_source, run_nested)?;
                 frun(parse_alias_type(&cmd_source)?)?;
             },
             Source::Mruby(mruby_source) => {
-                // TODO: Support <%= %>
-                validate_nested_cmd(mruby_source)?;
-                let mruby_source = repl::replace_all_func_nested(&RE_NESTED_CMD, mruby_source,
-                    |caps| cmd::command_output(caps.get(1).unwrap().as_str()))?;
+                validate_nested(mruby_source)?;
+                let mruby_source = repl::replace_all_func_nested(&RE_NESTED, mruby_source, run_nested)?;
                 frun(Parsed::Mruby(&mruby_source))?;
             },
         }
@@ -164,38 +182,73 @@ fn parse_alias_type(alias_value: &str) -> io::Result<Parsed> {
     }
 }
 
-fn validate_nested_cmd(alias_value: &str) -> io::Result<()> {
+fn validate_nested(alias_value: &str) -> io::Result<()> {
     lazy_static! {
-        static ref RE_NESTED_CMD: Regex = Regex::new(r"(\$\(|\))").unwrap();
+        static ref RE_NESTED: Regex = Regex::new(r"(\$\(|<%=|%>|\))").unwrap();
     }
 
-    let mut nested: Vec<(usize, usize)> = Vec::new();
-    let mut erred: Vec<(usize, usize)> = Vec::new();
+    let mut nested_cmd: Vec<ops::Range<usize>> = Vec::new();
+    let mut nested_mruby: Vec<ops::Range<usize>> = Vec::new();
+    let mut erred: Vec<ops::Range<usize>> = Vec::new();
 
-    for caps in RE_NESTED_CMD.captures_iter(alias_value) {
+    for caps in RE_NESTED.captures_iter(alias_value) {
         let elm = caps.get(0).unwrap();
         match elm.as_str() {
-            "$(" => nested.push((elm.start(), elm.end())),
+            "$(" => {
+                nested_cmd.push(elm.range());
+            },
             ")" => {
-                if nested.pop().is_none() {
-                    erred.push((elm.start(), elm.end()));
+                let mut ng = false;
+                if let Some(cmd_rng) = nested_cmd.pop() {
+                    if let Some(mruby_rng) = nested_mruby.last() {
+                        if cmd_rng.end < mruby_rng.end {
+                            ng = true;
+                        }
+                    }
+                } else {
+                    ng = true;
+                }
+
+                if ng {
+                    erred.push(elm.range());
                 }
             },
+            "<%=" => {
+                nested_mruby.push(elm.range());
+            },
+            "%>" => {
+                let mut ng = false;
+                if let Some(mruby_rng) = nested_mruby.pop() {
+                    if let Some(cmd_rng) = nested_cmd.last() {
+                        if mruby_rng.end < cmd_rng.end {
+                            ng = true;
+                        }
+                    }
+                } else {
+                    ng = true;
+                }
+
+                if ng {
+                    erred.push(elm.range());
+                }
+            }
+
             _ => {},
         }
     }
 
-    if nested.len() > 0 || erred.len() > 0 {
-        nested.append(&mut erred);
-        nested.sort_by(|a, b| a.0.cmp(&b.0));
+    if nested_cmd.len() > 0 || nested_mruby.len() > 0 || erred.len() > 0 {
+        erred.append(&mut nested_cmd);
+        erred.append(&mut nested_mruby);
+        erred.sort_by(|a, b| a.start.cmp(&b.start));
 
         // Colorize error location
         let mut s = String::new();
         let mut idx = 0;
-        for (start, end) in nested {
-            s.push_str(&alias_value[idx..start]);
-            s.push_str(&term::ewrite(&alias_value[start..end])?);
-            idx = end;
+        for rng in erred {
+            s.push_str(&alias_value[idx..rng.start]);
+            s.push_str(&term::ewrite(&alias_value[rng.start..rng.end])?);
+            idx = rng.end;
         }
         if idx < alias_value.len() {
             s.push_str(&alias_value[idx..]);

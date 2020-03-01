@@ -70,7 +70,7 @@ fn nested_match(re: &Regex, text: &str) -> Option<ops::Range<usize>>
     let mut rng = m.unwrap().range();
 
     while let Some(m) = re.find_at(text, rng.start + 1) {
-        if m.end() != rng.end {
+        if rng.end < m.start() {
             break;
         }
         rng = m.range();
@@ -81,10 +81,12 @@ fn nested_match(re: &Regex, text: &str) -> Option<ops::Range<usize>>
 pub fn partition_re<'a>(re: &Regex, text: &'a str) -> Option<(&'a str, &'a str, &'a str)> {
     if let Some(caps) = re.captures(text) {
         if let Some(elm) = caps.get(0) {
+            let start = elm.start();
+            let end = elm.end();
             return Some((
-                &text[..elm.start()],
-                &text[elm.start()..elm.end()],
-                &text[elm.end()..]
+                &text[..start],
+                &text[start..end],
+                &text[end..]
             ));
         }
     }
