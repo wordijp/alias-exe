@@ -58,7 +58,7 @@ fn parse_alias_value(
     const NESTED_MRUBY: &'static str = r"<%=(.*?)%>";
     lazy_static! {
         // parse args($1, $2, etc)
-        static ref RE_ARGS: Regex = Regex::new(r#"(\$[0-9*@#]|"\$[*@]")"#).unwrap();
+        static ref RE_ARGS: Regex = Regex::new(r#"(""\$[*@]""|"\$[*@]"|\$[0-9*@#])"#).unwrap();
         // parse nested $( ... ) or <%= ... %>
         static ref RE_NESTED_CMD: Regex = Regex::new(NESTED_CMD).unwrap();
         static ref RE_NESTED_MRUBY: Regex = Regex::new(NESTED_MRUBY).unwrap();
@@ -260,6 +260,14 @@ fn validate_nested(alias_value: &str) -> io::Result<()> {
 }
 
 fn parse_arg(arg: &str, args: &Vec<String>) -> io::Result<String> {
+    let f = |s: &str| {
+        if let Some(_) = s.find(char::is_whitespace) {
+            format!(r#""{}""#, s)
+        } else {
+            s.to_owned()
+        }
+    };
+
     match arg {
         "$0" => Ok(args[0].clone()),
         "$1" => Ok(if args.len() > 1 { args[1].clone() } else { "".to_owned() }),
@@ -274,23 +282,25 @@ fn parse_arg(arg: &str, args: &Vec<String>) -> io::Result<String> {
         "$#" => Ok(format!("{}", args.len() - 1)),
         "$*" => Err(Error::new(ErrorKind::InvalidData, format!("{}: $* is not supported, maybe \"$*\" ?", term::ewrite("failed")?))),
         "$@" => Err(Error::new(ErrorKind::InvalidData, format!("{}: $@ is not supported, maybe \"$@\" ?", term::ewrite("failed")?))),
-        "\"$*\"" => Ok(str_join(args.iter().skip(1), " ")),
-        "\"$@\"" => Ok(str_join(args.iter().skip(1), " ")),
+        "\"$*\"" => Ok(str_join(args.iter().skip(1).map(|x| x.to_string()), " ")),
+        "\"$@\"" => Ok(str_join(args.iter().skip(1).map(|x| x.to_string()), " ")),
+        "\"\"$*\"\"" => Ok(str_join(args.iter().skip(1).map(|x| f(x)), " ")),
+        "\"\"$@\"\"" => Ok(str_join(args.iter().skip(1).map(|x| f(x)), " ")),
         _ => Ok(arg.to_string()),
     }
 }
 
 fn str_join<'a, I>(mut it: I, sep: &str) -> String
 where
-    I: Iterator<Item = &'a String>
+    I: Iterator<Item = String>
 {
     let mut s = String::new();
     if let Some(first) = it.nth(0) {
-        s.push_str(first);
+        s.push_str(&first);
     }
     for x in it {
         s.push_str(sep);
-        s.push_str(x);
+        s.push_str(&x);
     }
     s
 }
