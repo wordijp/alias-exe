@@ -58,7 +58,7 @@ fn parse_alias_value(
     const NESTED_MRUBY: &'static str = r"(?ms)<%=(.*?)%>";
     lazy_static! {
         // parse args($1, $2, etc)
-        static ref RE_ARGS: Regex = Regex::new(r#"(""\$[*@]""|"\$[*@]"|\$[0-9*@#])"#).unwrap();
+        static ref RE_ARGS: Regex = Regex::new(r#"("\$[*+@]"|\$[0-9*+@#])"#).unwrap();
         // parse nested $( ... ) or <%= ... %>
         static ref RE_NESTED_CMD: Regex = Regex::new(NESTED_CMD).unwrap();
         static ref RE_NESTED_MRUBY: Regex = Regex::new(NESTED_MRUBY).unwrap();
@@ -289,12 +289,11 @@ fn parse_arg(arg: &str, args: &Vec<String>) -> io::Result<String> {
         "$8" => Ok(if args.len() > 8 { args[8].clone() } else { "".to_owned() }),
         "$9" => Ok(if args.len() > 9 { args[9].clone() } else { "".to_owned() }),
         "$#" => Ok(format!("{}", args.len() - 1)),
-        "$*" => Err(Error::new(ErrorKind::InvalidData, format!("{}: $* is not supported, maybe \"$*\" ?", term::ewrite("failed")?))),
+        "$*" => Err(Error::new(ErrorKind::InvalidData, format!("{}: $* is not supported", term::ewrite("failed")?))),
         "$@" => Err(Error::new(ErrorKind::InvalidData, format!("{}: $@ is not supported, maybe \"$@\" ?", term::ewrite("failed")?))),
-        "\"$*\"" => Ok(str_join(args.iter().skip(1).map(|x| x.to_string()), " ")),
-        "\"$@\"" => Ok(str_join(args.iter().skip(1).map(|x| x.to_string()), " ")),
-        "\"\"$*\"\"" => Ok(str_join(args.iter().skip(1).map(|x| f(x)), " ")),
-        "\"\"$@\"\"" => Ok(str_join(args.iter().skip(1).map(|x| f(x)), " ")),
+        "\"$*\"" => Err(Error::new(ErrorKind::InvalidData, format!("{}: \"$*\" is not supported, maybe \"$+\" ?", term::ewrite("failed")?))),
+        "\"$+\"" => Ok(format!(r#""{}""#, str_join(args.iter().skip(1).map(|x| x.to_string()), " "))),
+        "\"$@\"" => Ok(str_join(args.iter().skip(1).map(|x| f(x)), " ")),
         _ => Ok(arg.to_string()),
     }
 }
