@@ -54,8 +54,8 @@ fn parse_alias_value(
 )
     -> io::Result<()>
 {
-    const NESTED_CMD: &'static str = r"\$\((.*?)\)";
-    const NESTED_MRUBY: &'static str = r"<%=(.*?)%>";
+    const NESTED_CMD: &'static str = r"(?ms)\$\((.*?)\)";
+    const NESTED_MRUBY: &'static str = r"(?ms)<%=(.*?)%>";
     lazy_static! {
         // parse args($1, $2, etc)
         static ref RE_ARGS: Regex = Regex::new(r#"(""\$[*@]""|"\$[*@]"|\$[0-9*@#])"#).unwrap();
@@ -184,22 +184,26 @@ fn parse_alias_type(alias_value: &str) -> io::Result<Parsed> {
 
 fn validate_nested(alias_value: &str) -> io::Result<()> {
     lazy_static! {
-        static ref RE_NESTED: Regex = Regex::new(r"(\$\(|<%=|%>|\))").unwrap();
+        static ref RE_NESTED: Regex = Regex::new(r"(?ms)(\$\(|%\w\(|\(|<%=|%>|\))").unwrap();
     }
 
-    let mut nested_cmd: Vec<ops::Range<usize>> = Vec::new();
+    let mut nested_brackets: Vec<ops::Range<usize>> = Vec::new();
     let mut nested_mruby: Vec<ops::Range<usize>> = Vec::new();
     let mut erred: Vec<ops::Range<usize>> = Vec::new();
 
     for caps in RE_NESTED.captures_iter(alias_value) {
         let elm = caps.get(0).unwrap();
-        match elm.as_str() {
+        let s = elm.as_str();
+        match s {
             "$(" => {
-                nested_cmd.push(elm.range());
+                nested_brackets.push(elm.range());
+            },
+            "(" => {
+                nested_brackets.push(elm.range());
             },
             ")" => {
                 let mut ng = false;
-                if let Some(cmd_rng) = nested_cmd.pop() {
+                if let Some(cmd_rng) = nested_brackets.pop() {
                     if let Some(mruby_rng) = nested_mruby.last() {
                         if cmd_rng.end < mruby_rng.end {
                             ng = true;
@@ -219,7 +223,7 @@ fn validate_nested(alias_value: &str) -> io::Result<()> {
             "%>" => {
                 let mut ng = false;
                 if let Some(mruby_rng) = nested_mruby.pop() {
-                    if let Some(cmd_rng) = nested_cmd.last() {
+                    if let Some(cmd_rng) = nested_brackets.last() {
                         if mruby_rng.end < cmd_rng.end {
                             ng = true;
                         }
@@ -233,12 +237,17 @@ fn validate_nested(alias_value: &str) -> io::Result<()> {
                 }
             }
 
-            _ => {},
+            _ => {
+                // check % syntax for ruby
+                if &s[0..1] == "%" {
+                    nested_brackets.push(elm.range());
+                }
+            },
         }
     }
 
-    if nested_cmd.len() > 0 || nested_mruby.len() > 0 || erred.len() > 0 {
-        erred.append(&mut nested_cmd);
+    if nested_brackets.len() > 0 || nested_mruby.len() > 0 || erred.len() > 0 {
+        erred.append(&mut nested_brackets);
         erred.append(&mut nested_mruby);
         erred.sort_by(|a, b| a.start.cmp(&b.start));
 
