@@ -34,7 +34,7 @@ pub fn command_spawn(cmd: &str) -> io::Result<()> {
     Ok(())
 }
 
-fn split_args(cmd: &str) -> Vec<String> {
+pub fn split_args(cmd: &str) -> Vec<String> {
     let mut args = Vec::new();
 
     let mut s = String::new();

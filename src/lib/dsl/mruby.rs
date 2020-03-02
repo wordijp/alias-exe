@@ -1,9 +1,10 @@
 use std::io::{self, Error, ErrorKind};
-use std::env;
+use std::{env, process};
 
 use mrusty::*;
 
 use crate::lib::term;
+use crate::lib::cmd;
 
 pub fn mruby_new() -> Result<mrusty::MrubyType, mrusty::MrubyError> {
     let mruby = mrusty::Mruby::new();
@@ -35,6 +36,19 @@ pub fn mruby_new() -> Result<mrusty::MrubyType, mrusty::MrubyError> {
 
           def to_cmd_deep
             MrubyArrayCmdDeep.new self
+          end
+
+          def self.from_cmd(cmd_args_string)
+            MrubyArrayFromCmd.from_cmd cmd_args_string
+          end
+
+          def from_cmd!(cmd_args_string)
+            self[0..-1] = MrubyArrayFromCmd.from_cmd cmd_args_string
+            self
+          end
+
+          def from_cmd(cmd_args_string)
+            MrubyArrayFromCmd.from_cmd cmd_args_string
           end
         end
         "#)?;
@@ -72,6 +86,34 @@ fn setup_array_cmd_legacy(mruby: &mrusty::MrubyType) {
         });
     });
     mruby.def_file::<ArrayCmdDeep>("array_cmd_deep");
+
+    mruby_class!(mruby.clone(), "MrubyArrayFromCmd", {
+        def_self!("from_cmd", |mruby, _slf: Value, cmd_args_string: Value| {
+            let cmd_args_string = cmd_args_string.to_str();
+            if let Err(err) = cmd_args_string {
+                eprintln!("{}: in Array.from_cmd: {}", term::ewrite("mruby failed").unwrap(), err);
+                process::exit(1);
+            }
+
+            let a = cmd::split_args(cmd_args_string.unwrap()).iter()
+                .map(|x| cmdstr2value(&mruby, x))
+                .collect();
+            mruby.array(a)
+        });
+    });
+}
+fn cmdstr2value(mruby: &mrusty::MrubyType, s: &str) -> Value {
+    if let Ok(n) = s.parse::<i32>() {
+        return mruby.fixnum(n);
+    }
+    if let Ok(f) = s.parse::<f64>() {
+        return mruby.float(f);
+    }
+    if let Ok(b) = s.parse::<bool>() {
+        return mruby.bool(b);
+    }
+
+    mruby.string(s)
 }
 
 enum MrubyValue {
