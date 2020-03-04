@@ -1,4 +1,5 @@
 use std::{fs, env, ops};
+use std::{rc::Rc, cell::RefCell};
 use std::io::{self, Error, ErrorKind};
 
 use regex::Regex;
@@ -15,6 +16,8 @@ pub fn read(listdir: &str, alias_name: &str) -> io::Result<String> {
 
 enum Parsed<'a> {
     SetEnv(&'a str, &'a str),
+    Pushd(&'a str),
+    Popd(),
     Cmd(&'a str),
     Mruby(&'a str),
 }
@@ -26,9 +29,13 @@ pub fn run(alias_value: &str, args: &Vec<String>) -> io::Result<i32> {
     //}
     let mruby = dsl::mruby::mruby_new().unwrap();
 
+    let dir_stack = Rc::new(RefCell::new(Vec::new()));
+
     parse_alias_value(alias_value, args, &mruby, |parsed| {
         match parsed {
             Parsed::SetEnv(key, value) => env::set_var(key, value),
+            Parsed::Pushd(path) => pushd(&mut dir_stack.borrow_mut(), path)?,
+            Parsed::Popd() => popd(&mut dir_stack.borrow_mut())?,
             Parsed::Cmd(source) => cmd::command_spawn(source)?,
             Parsed::Mruby(source) => { mruby_run(&mruby, source)?; },
         }
@@ -36,6 +43,28 @@ pub fn run(alias_value: &str, args: &Vec<String>) -> io::Result<i32> {
     })?;
 
     Ok(0)
+}
+
+fn pushd(stack: &mut Vec<String>, path: &str) -> io::Result<()> {
+    let prev = env::current_dir().unwrap().to_str().unwrap().to_owned();
+    if let Err(err) = env::set_current_dir(path) {
+        return Err(Error::new(ErrorKind::InvalidData, format!("{}: @pushd {}: {}", term::ewrite("failed")?, path, err)));
+    }
+    stack.push(prev);
+
+    Ok(())
+}
+
+fn popd(stack: &mut Vec<String>) -> io::Result<()> {
+    let prev = stack.pop();
+    if None == prev {
+        return Err(Error::new(ErrorKind::InvalidData, format!("{}: @popd: directory stack empty", term::ewrite("failed")?)));
+    }
+    if let Err(err) = env::set_current_dir(prev.unwrap()) {
+        return Err(Error::new(ErrorKind::InvalidData, format!("{}: @popd: {}", term::ewrite("failed")?, err)));
+    }
+
+    Ok(())
 }
 
 fn mruby_run(mruby: &mrusty::MrubyType, source: &str) -> io::Result<mrusty::Value> {
@@ -171,6 +200,9 @@ fn parse_cmd_type(alias_value: &str) -> io::Result<Parsed> {
 
         static ref RE_SET: Regex = Regex::new(r"^@set").unwrap();
         static ref RE_SET_KEY_VALUE: Regex = Regex::new(r"^([^=]+)=(.*)").unwrap();
+
+        static ref RE_PUSHD: Regex = Regex::new(r"^@pushd").unwrap();
+        static ref RE_POPD: Regex = Regex::new(r"^@popd").unwrap();
     }
 
     if RE_AT.is_match(alias_value) {
@@ -196,6 +228,22 @@ fn parse_cmd_type(alias_value: &str) -> io::Result<Parsed> {
                 let value = caps.get(2).unwrap().as_str();
 
                 return Ok(Parsed::SetEnv(key, value));
+            },
+            "@pushd" => {
+                if value.len() == 0 {
+                    let (s1, s2, s3) = repl::partition_re(&RE_PUSHD, alias_value).unwrap();
+                    return Err(Error::new(ErrorKind::InvalidData, format!("{}: @pushd path is none\n\n{}{}{}", term::ewrite("failed")?, s1, term::ewrite(s2)?, s3)));
+                }
+
+                return Ok(Parsed::Pushd(value));
+            },
+            "@popd" => {
+                if value.len() > 0 {
+                    let (s1, s2, s3) = repl::partition_re(&RE_POPD, alias_value).unwrap();
+                    return Err(Error::new(ErrorKind::InvalidData, format!("{}: @popd unknown args\n\n{}{}{}", term::ewrite("failed")?, s1, term::ewrite(s2)?, s3)));
+                }
+
+                return Ok(Parsed::Popd());
             },
             _ => {
                 let (s1, s2, s3) = repl::partition_re(&RE_AT_KEY, alias_value).unwrap();
