@@ -90,7 +90,7 @@ fn parse_alias_value(
             Source::Cmd(cmd_source) => {
                 validate_nested(cmd_source)?;
                 let cmd_source = repl::replace_all_func_nested(&RE_NESTED, cmd_source, run_nested)?;
-                frun(parse_alias_type(&cmd_source)?)?;
+                frun(parse_cmd_type(&cmd_source)?)?;
             },
             Source::Mruby(mruby_source) => {
                 validate_nested(mruby_source)?;
@@ -163,24 +163,45 @@ fn split_source_func(
 
 // ---
 
-fn parse_alias_type(alias_value: &str) -> io::Result<Parsed> {
+fn parse_cmd_type(alias_value: &str) -> io::Result<Parsed> {
     lazy_static! {
-        static ref RE_PRE_ENV: Regex = Regex::new(r"^@set").unwrap();
-        static ref RE_ENV: Regex = Regex::new(r"^@set\s+([^=]+)=(.*)").unwrap();
+        static ref RE_AT: Regex = Regex::new(r"^@").unwrap();
+        static ref RE_AT_KEY: Regex = Regex::new(r"^(@[^\s]+)").unwrap();
+        static ref RE_AT_KEY_VALUE: Regex = Regex::new(r"^(@[^\s]+)(.*)").unwrap();
+
+        static ref RE_SET: Regex = Regex::new(r"^@set").unwrap();
+        static ref RE_SET_KEY_VALUE: Regex = Regex::new(r"^([^=]+)=(.*)").unwrap();
     }
 
-    if RE_PRE_ENV.is_match(alias_value) {
-        let caps = RE_ENV.captures(alias_value);
+    if RE_AT.is_match(alias_value) {
+        let caps = RE_AT_KEY_VALUE.captures(alias_value);
         if caps.is_none() {
-            let (s1, s2, s3) = repl::partition_re(&RE_PRE_ENV, alias_value).unwrap();
-            return Err(Error::new(ErrorKind::InvalidData, format!("{}: illegal @set format\n\n{}{}{}", term::ewrite("failed")?, s1, term::ewrite(s2)?, s3)));
+            let (s1, s2, s3) = repl::partition_re(&RE_AT, alias_value).unwrap();
+            return Err(Error::new(ErrorKind::InvalidData, format!("{}: illegal @command format\n\n{}{}{}", term::ewrite("failed")?, s1, term::ewrite(s2)?, s3)));
         }
-
         let caps = caps.unwrap();
         let key = caps.get(1).unwrap().as_str();
-        let value = caps.get(2).unwrap().as_str();
+        let value = caps.get(2).unwrap().as_str().trim();
 
-        Ok(Parsed::SetEnv(key, value))
+        match key {
+            "@set" => {
+                let caps = RE_SET_KEY_VALUE.captures(value);
+                if caps.is_none() {
+                    let (s1, s2, s3) = repl::partition_re(&RE_SET, alias_value).unwrap();
+                    return Err(Error::new(ErrorKind::InvalidData, format!("{}: illegal @set format\n\n{}{}{}", term::ewrite("failed")?, s1, term::ewrite(s2)?, s3)));
+                }
+
+                let caps = caps.unwrap();
+                let key = caps.get(1).unwrap().as_str();
+                let value = caps.get(2).unwrap().as_str();
+
+                return Ok(Parsed::SetEnv(key, value));
+            },
+            _ => {
+                let (s1, s2, s3) = repl::partition_re(&RE_AT_KEY, alias_value).unwrap();
+                return Err(Error::new(ErrorKind::InvalidData, format!("{}: {} is unknown @command\n\n{}{}{}", term::ewrite("failed")?, key, s1, term::ewrite(s2)?, s3)));
+            }
+        }
     } else {
         Ok(Parsed::Cmd(alias_value))
     }
