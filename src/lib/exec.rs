@@ -119,6 +119,8 @@ fn split_source_func(
 {
     lazy_static! {
         static ref RE_MRUBY_RANGE: Regex = Regex::new(r"(?ms)^\s*```ruby\s*$\n(.+?)\n^\s*```\s*$").unwrap();
+
+        static ref RE_CMD_COMMENT: Regex = Regex::new(r"^#").unwrap();
     }
 
     let mut cur = 0;
@@ -131,6 +133,7 @@ fn split_source_func(
                 .split('\n')
                 .map(|x| x.trim())
                 .filter(|x| x.len() > 0)
+                .filter(|x| !RE_CMD_COMMENT.is_match(x))
             {
                 fsource(Source::Cmd(cmd_source))?;
             }
@@ -150,6 +153,7 @@ fn split_source_func(
             .split('\n')
             .map(|x| x.trim())
             .filter(|x| x.len() > 0)
+            .filter(|x| !RE_CMD_COMMENT.is_match(x))
         {
             fsource(Source::Cmd(cmd_source))?;
         }
