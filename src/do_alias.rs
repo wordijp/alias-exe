@@ -33,8 +33,8 @@ fn try_run(args: &Vec<String>) -> io::Result<()> {
     if let Some(ref matches) = matches.subcommand_matches("remove") {
         remove(matches)?;
     }
-    if let Some(ref _matches) = matches.subcommand_matches("list") {
-        list()?;
+    if let Some(ref matches) = matches.subcommand_matches("list") {
+        list(matches)?;
     }
 
     Ok(())
@@ -57,10 +57,16 @@ fn remove(matches: &clap::ArgMatches<'static>) -> io::Result<()> {
     Ok(())
 }
 
-fn list() -> io::Result<()> {
-    for (key, value) in lib::alias::iter() {
-        print!("{}", term::keywrite(&key)?);
-        println!(":\n{}", value);
+fn list(matches: &clap::ArgMatches<'static>) -> io::Result<()> {
+    if matches.is_present("key") {
+        for (key, _value) in lib::alias::iter() {
+            println!("{}", term::keywrite(&key)?);
+        }
+    } else {
+        for (key, value) in lib::alias::iter() {
+            print!("{}", term::keywrite(&key)?);
+            println!(":\n{}", value);
+        }
     }
     Ok(())
 }
@@ -100,6 +106,9 @@ fn clap_matches(args: &Vec<String>) -> clap::ArgMatches<'static> {
             SubCommand::with_name("remove")
                 .arg(Arg::from_usage("<alias_name> 'alias exe name'"))
         )
-        .subcommand(SubCommand::with_name("list"))
+        .subcommand(
+            SubCommand::with_name("list")
+                .arg(Arg::from_usage("-k --key 'List up only key'"))
+        )
         .get_matches_from(args)
 }
