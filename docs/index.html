@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hello Bulma!</title>
+    <!-- prism -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.19.0/themes/prism.min.css">
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.19.0/prism.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.19.0/components/prism-bash.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.19.0/components/prism-ruby.min.js"></script>
+
+    <!-- bulma -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.0/css/bulma.min.css">
+    <script defer src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"></script>
+
+    <style>
+      body {
+        padding-top: 32px;
+      }
+      header.navbar {
+        /* Bulma $navbar-height: 52px */
+        /* 52px to 32px */
+        top: -10px !important;
+        height: 42px !important;
+        min-height: 42px !important;
+      }
+      header .logo {
+        font-size: 1.4rem;
+      }
+      aside {
+        width: 200px;
+        height: 100vh;
+        overflow-y: auto;
+      }
+      aside.fixed {
+        position: fixed;
+      }
+      .is-narrow.aside-dummy {
+        width: 200px;
+      }
+      .section {
+        /*padding-top: 1rem;*/
+        padding-bottom: 1rem;
+      }
+      /* fixed conflicts bulma and prism.js */
+      code .tag,
+      code .number {
+        display: inline;
+        padding: inherit;
+        font-size: inherit;
+        line-height: inherit;
+        text-align: inherit;
+        vertical-align: inherit;
+        border-radius: inherit;
+        font-weight: inherit;
+        white-space: inherit;
+        background: inherit;
+        margin: inherit;
+      }
+      pre.cmd {
+        background: #333 !important;
+        color: #eee !important;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="navbar is-fixed-top is-dark">
+      <div class="navbar-brand">
+        <div class="navbar-item">
+          <span class="logo">alias-exe</span>
+          &nbsp;v1.0.0
+        </div>
+      </div>
+    </header>
+    <div class="columns is-mobile">
+      <aside class="box fixed">
+        <p class="menu-label">
+          Overview
+        </p>
+        <ul class="menu-list">
+          <li><a href="#supportOverview">Supports overview</a></li>
+        </ul>
+
+        <p class="menu-label">
+          Commands
+        </p>
+        <ul class="menu-list">
+          <li><a href="#command">Command</a></li>
+          <li><a href="#nestedCommand">Nested command</a></li>
+          <li><a href="#arguments">Arguments</a></li>
+          <li><a href="#builtinCommand">Built-in command</a></li>
+          <li><a href="#mruby">mruby</a></li>
+          <li><a href="#nestedMruby">Nested mruby</a></li>
+        </ul>
+        
+        <p class="menu-label">
+          Combine
+        </p>
+        <ul class="menu-list">
+          <li><a href="#nestedCombine">Nested combine</a></li>
+        </ul>
+      </aside>
+
+      <!-- NOTE: dummy for fixed <aside> layout -->
+      <div class="column is-narrow aside-dummy"></div>
+
+      <!-- main contents -->
+      <article class="column">
+        <section id="supportOverview" class="section box">
+          <h2 class="title">Supports overview</h2>
+            <pre><code class="language-bash"># overview.txt
+
+# command
+echo command
+
+# nested command
+echo nested $(echo command)
+
+# arguments
+echo argc=$# args="$@"
+
+# built-in commands
+@set ENV=builtin_set_environment
+echo %ENV%
+
+CD
+@pushd ..
+CD
+@popd
+CD
+
+# mruby as glue code
+</code><code class="language-ruby">```ruby
+# this is mruby comment
+puts "mruby code"
+def add(a, b)
+  a + b
+end
+```</code><code class="language-bash">
+
+# nested mruby
+echo 2 + 3 = <%= add(2, 3) %>
+</code></pre>
+
+<pre class="cmd"><code>&gt; overview hoge foo "hello world"
+command
+nested command
+argc=3 args=hoge foo "hello world"
+builtin_set_environment
+C:\path\to
+C:\path
+C:\path\to
+mruby code
+2 + 3 = 5
+</code></pre>
+        </section>
+        
+
+        <section id="command" class="section box">
+          <h2 class="title">Command</h2>
+          <p>Execute command via command prompt, but with a few differences.</p>
+          <br>
+          For this argument: <code>"hello world" foo "bar"</code>
+          <div class="content">
+            <ol>
+              <li>Split the argument tokens</li>
+              to <code>[hello world] [foo] [bar]</code>
+              <li>Enclose arguments containing spaces with <code>"</code></li>
+              to <code>["hello world"] [foo] [bar]</code>
+              <li>Join to space separator</li>
+              to <code>"hello world" foo bar</code>
+            </ol>
+          </div>
+          For example: <code>command-sample</code> alias
+          <pre><code class="language-bash"># command-sample.txt
+echo "$@"
+</code></pre>
+
+<pre class="cmd"><code>&gt; command-sample "hello world" foo "bar"
+"hello world" foo bar
+</code></pre>
+        </section>
+        
+        <section id="nestedCommand" class="section box">
+          <h2 class="title">Nested command</h2>
+          <p>Execute nested command (<code>$( ... )</code>) via bash-like, but unlike bash, this is sequential execution.</p>
+          <br>
+          
+          For example: <code>nested-command-sample</code> alias
+          <pre><code class="language-bash"># nested-command-sample.txt
+echo $( ^
+  echo $( ^
+    echo $( ^
+      echo 1 &gt;&gt; o.txt ^
+    ) $( ^
+      echo $( ^
+        echo 2 &gt;&gt; o.txt ^
+      ) 3 &gt;&gt; o.txt ^
+    ) 4 &gt;&gt; o.txt ^
+  ) 5 &gt;&gt; o.txt ^
+) 6 &gt;&gt; o.txt
+</code></pre>
+
+<pre class="cmd"><code>&gt; nested-command-sample
+&gt; cat o.txt
+1
+2
+3
+4
+5
+6
+</code></pre>
+        </section>
+
+        
+        <section id="arguments" class="section box">
+          <h2 class="title">Arguments</h2>
+          <p>via bash-like, but with a few differences.</p>
+          <br>
+          Support list:
+          <div class="content">
+            <ul>
+              <li><code>$0</code></li>
+              <li><code>$1</code>,<code>$2</code>,<code>$3</code>,...,<code>$9</code></li>
+              <li><code>$#</code>,<code>"$@"</code>,<code>"$+"</code></li>
+            </ul>
+          </div>
+          <i><code>$*</code>, <code>$@</code>, <code>"$*"</code> is not supported.</i>
+
+          <br>
+          <br>
+          <p><code>"$+"</code> is unique arguments, expands arguments on a single line, like <code>"$*"</code>, but keeps asterisks it.</p>
+          <br>
+
+          For example: <code>arguments-sample</code> alias
+          <pre><code class="language-bash"># arguments-sample.txt
+echo alias_name=$0
+echo argc=$# args="$@"
+echo $1 world
+echo hello $2
+echo "$+"
+</code></pre>
+
+<pre class="cmd"><code>&gt; arguments-sample hello world "fo* bar"
+alias_name=arguments-sample
+argc=3 args=hello world "foo bar"
+hello world
+hello world
+"hello world fo* bar"
+</code></pre>
+        </section>
+
+
+        <section id="builtinCommand" class="section box">
+          <h2 class="title">Built-in command</h2>
+          <p>Commands are executed internally by <code>cmd / c</code> one by one, so some commands have no meaning.</p>
+          <em>For example: <code>CD</code>, <code>SET</code>.</em><br>
+          Use the built-in command instead.
+          <br>
+          <br>
+          Support list:
+          <div class="content">
+            <ul>
+              <li><code>@set &lt;key&gt;=&lt;value&gt;</code></li>
+              <li><code>@pushd &lt;path&gt;</code></li>
+              <li><code>@popd</code></li>
+            </ul>
+          </div>
+
+          For example: <code>builtin-command-sample</code> alias
+          <pre><code class="language-bash"># builtin-command-sample.txt
+@set ENV=builtin_set_environment
+echo %ENV%
+
+# direct execute
+D:/tools/saytool/bin/say
+# set path environment, and execute
+@set PATH=D:/tools/saytool/bin;%PATH%
+say
+
+CD
+@pushd ..
+CD
+@pushd D:/dev
+CD
+@popd
+CD
+@popd
+CD
+</code></pre>
+
+<pre class="cmd"><code>&gt; builtin-command-sample
+builtin_set_environment
+hello!
+hello!
+C:\path\to
+C:\path
+D:\dev
+C:\path
+C:\path\to
+</code></pre>
+        </section>
+
+
+        <section id="mruby" class="section box">
+          <h2 class="title">mruby</h2>
+          <p>mruby is run as gluecode.</p>
+          <p>Write the mruby code between the code blocks <code>```ruby</code> and <code>```</code>, this code block can be written multiple times.</p>
+          <p>There are also some missing features, there is implemented and called by Rust.</p>
+          <br>
+          Implemented list by Rust:<br>
+          <i>A minimal implementation</i>
+          <div class="content">
+            <ul>
+              <li><code>ARGV</code></li>
+              <li><code>STDIN</code>
+                <ul>
+                  <li><code>gets</code></li>
+                  <li><code>readline</code></li>
+                  <li><code>readlines</code></li>
+                </ul>
+              </li>
+              <li><code>STDOUT</code>
+                <ul>
+                  <li><code>puts</code></li>
+                  <li><code>print</code></li>
+                </ul>
+              </li>
+              <li><code>STDERR</code>
+                <ul>
+                  <li><code>puts</code></li>
+                  <li><code>print</code></li>
+                </ul>
+              </li>
+              <li><code>Array</code>
+                <ul>
+                  <li><code>to_cmd</code> <i>See below "Nested mruby"</i></li>
+                  <li><code>to_cmd_deep</code> <i>See below "Nested mruby"</i></li>
+                  <li><code>self.from_cmd(cmd_args_string)</code></li>
+                  <li><code>from_cmd!(cmd_args_string)</code></li>
+                  <li><code>from_cmd(cmd_args_string)</code></li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+          <code>to_cmd</code> and <code>from_cmd</code> implemented in <code>Array</code> are unique functions to exchange arrays with command prompt.<br>
+          <code>to_cmd</code> converts an array into a command prompt argument list.<br>
+          <code>from_cmd</code> converts the command prompt argument list into an array.<br>
+
+          <br>
+          For example: <code>mruby-sample</code> alias
+          <pre><code class="language-bash"># mruby-sample.txt
+echo 1 cmd
+</code><code class="language-ruby">```ruby
+puts '2 mruby'
+print 'ARGV='
+puts ARGV
+puts 'gets=' + STDIN.gets
+```</code><code class="language-bash">
+echo 3 cmd
+</code><code class="language-ruby">```ruby
+puts '4 mruby'
+a = [].from_cmd %q( "hello world" foo bar 1 3.14 )
+# &lt;CRLF&gt;
+puts a
+# &lt;LF&gt;
+STDOUT.puts a
+```</code><code class="language-bash">
+echo 5 cmd
+</code></pre>
+
+<pre class="cmd"><code>&gt; echo from_stdin | mruby-sample hoge piyo
+1 cmd
+2 mruby
+ARGV=["hoge", "piyo"]
+gets=from_stdin
+3 cmd
+4 mruby
+["hello world", "foo", "bar", 1, 3.14]
+["hello world", "foo", "bar", 1, 3.14]
+5 cmd
+</code></pre>
+        </section>
+
+        
+        <section id="nestedMruby" class="section box">
+          <h2 class="title">Nested mruby</h2>
+          <p>Execute nested mruby (<code><%= ... %></code>) via Rails template(ERB)-like, However, this can be multi-stage nested.</p>
+          <br>
+
+          For example: <code>nested-mruby-sample</code> alias
+          <pre><code class="language-bash"># nested-mruby-sample.txt
+</code><code class="language-ruby">```ruby
+def say_str
+  "hello!"
+end
+```</code><code class="language-bash">
+echo &lt;%= say_str %&gt;
+echo 2 + 3 = &lt;%= 2 + &lt;%= 3 %&gt;%&gt;
+echo 3 + 5 = &lt;%= "3" + &lt;%= 5 %&gt;.to_s %&gt;
+</code></pre>
+
+<pre class="cmd"><code>&gt; nested-mruby-sample
+hello!
+2 + 3 = 5
+3 + 5 = 35
+</code></pre>
+        </section>
+
+
+        <section id="nestedCombine" class="section box">
+          <h2 class="title">Nested combine</h2>
+          <p>Let's try, combine nested command and nested mruby.</p>
+          <br>
+
+          For example: <code>nested-combine-sample</code> alias
+          <pre><code class="language-bash"># nested-combine-sample.txt
+</code><code class="language-ruby">```ruby
+underscore = "_"
+hello_world = "success!"
+```</code><code class="language-bash">
+
+# $1: hello, $2: world
+# need sed command installed, for example, msys2
+echo &lt;%= $(echo $(echo $1)&lt;%= underscore %&gt;XXX | sed 's/XXX/$(echo $2)/g') %&gt;
+</code></pre>
+
+<pre class="cmd"><code>&gt; nested-combine-sample hello world
+success!
+</code></pre>
+        </section>
+      </article>
+    </div>
+  </body>
+</html>
