@@ -16,6 +16,9 @@ Support [scoop.sh](https://scoop.sh/), you can install alias-exe from [wordijp/s
 > scoop install wordijp/alias-exe
 ```
 
+Finally, add the alias directory(`C:/path/to/alias-exe/list`) to PATH.
+
+
 ## How does this work?
 
 When you execute `alias.exe` directly, it manage command the alias list.  
@@ -31,6 +34,8 @@ The execution contents are saved as a txt file in the same directory as the symb
 ```cmd
 > alias edit hello
 ```
+
+Launch editor is `vim` or `notepad`.
 
 ```
 # hello.txt
