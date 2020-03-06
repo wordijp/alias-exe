@@ -33,7 +33,7 @@ pub fn run(alias_value: &str, args: &Vec<String>) -> io::Result<i32> {
 
     parse_alias_value(alias_value, args, &mruby, |parsed| {
         match parsed {
-            Parsed::SetEnv(key, value) => env::set_var(key, value),
+            Parsed::SetEnv(key, value) => setenv(key, value)?,
             Parsed::Pushd(path) => pushd(&mut dir_stack.borrow_mut(), path)?,
             Parsed::Popd() => popd(&mut dir_stack.borrow_mut())?,
             Parsed::Cmd(source) => cmd::command_spawn(source)?,
@@ -45,6 +45,22 @@ pub fn run(alias_value: &str, args: &Vec<String>) -> io::Result<i32> {
     Ok(0)
 }
 
+fn setenv(key: &str, value: &str) -> io::Result<()> {
+    lazy_static! {
+        static ref RE_ENV: Regex = Regex::new(r"%(.+?)%").unwrap();
+    }
+    let value = repl::replace_all_func(&RE_ENV, value,
+        |caps| {
+            if let Ok(var) = env::var(caps.get(1).unwrap().as_str()) {
+                Ok(var)
+            } else {
+                Ok(caps.get(0).unwrap().as_str().to_owned())
+            }
+        })?;
+
+    env::set_var(key, value);
+    Ok(())
+}
 fn pushd(stack: &mut Vec<String>, path: &str) -> io::Result<()> {
     let prev = env::current_dir().unwrap().to_str().unwrap().to_owned();
     if let Err(err) = env::set_current_dir(path) {
