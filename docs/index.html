@@ -389,6 +389,9 @@ gets=from_stdin
           <h2 class="title">Nested mruby</h2>
           <p>Execute nested mruby (<code><%= ... %></code>) via Rails template(ERB)-like, However, this can be multi-stage nested.</p>
           <br>
+          <code>to_cmd</code> converts an array into a command prompt argument list.<br>
+          <code>to_cmd_deep</code> converts an nested array into a command prompt argument list.<br>
+          <br>
 
           For example: <code>nested-mruby-sample</code> alias
           <pre><code class="language-bash"># nested-mruby-sample.txt
@@ -396,16 +399,23 @@ gets=from_stdin
 def say_str
   "hello!"
 end
+
+a = [5, 'hello world', 7, 'foo', 'bar', 11]
+b = [5, 'hello world', 7, [['foo', 'bar'], 11]]
 ```</code><code class="language-bash">
 echo &lt;%= say_str %&gt;
 echo 2 + 3 = &lt;%= 2 + &lt;%= 3 %&gt;%&gt;
 echo 3 + 5 = &lt;%= "3" + &lt;%= 5 %&gt;.to_s %&gt;
+echo &lt;%= a.to_cmd %&gt;
+echo &lt;%= b.to_cmd_deep %&gt;
 </code></pre>
 
 <pre class="cmd"><code>&gt; nested-mruby-sample
 hello!
 2 + 3 = 5
 3 + 5 = 35
+5 "hello world" 7 foo bar 11
+5 "hello world" 7 foo bar 11
 </code></pre>
         </section>
 
