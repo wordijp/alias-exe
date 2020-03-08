@@ -3,11 +3,13 @@
 This is a provides Bash alias-like to Windows.  
 It supports Bash-like arguments `$1, "$@", etc`, nested command `$( ... )`, and mruby as a unique feature.
 
-## Download
+## Manual Install
 
-See [releases](https://github.com/wordijp/alias-exe/releases)
+Download from [releases](https://github.com/wordijp/alias-exe/releases)
 
-## Install
+Finally, add directories(`C:/path/to/alias-exe`(For alias.exe) and `C:/path/to/alias-exe/list`(For created alias list) to PATH.
+
+## Scoop Install
 
 Support [scoop.sh](https://scoop.sh/), you can install alias-exe from [wordijp/scoop-bucket](https://github.com/wordijp/scoop-bucket).
 
@@ -16,8 +18,7 @@ Support [scoop.sh](https://scoop.sh/), you can install alias-exe from [wordijp/s
 > scoop install wordijp/alias-exe
 ```
 
-Finally, add the alias directory(`C:/path/to/alias-exe/list`) to PATH.
-
+*simple*
 
 ## How does this work?
 
