@@ -11,7 +11,7 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.19.0/components/prism-ruby.min.js"></script>
 
     <!-- bulma -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.0/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.2/css/bulma.min.css">
     <script defer src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"></script>
 
     <style>
@@ -138,10 +138,14 @@ puts "mruby code"
 def add(a, b)
   a + b
 end
+
+msg = `echo hi`
+puts "shell command on mruby : #{msg}"
 ```</code><code class="language-bash">
 
 # nested mruby
 echo 2 + 3 = <%= add(2, 3) %>
+echo shell command on nested mruby : <%= `echo hi!` %>
 </code></pre>
 
 <pre class="cmd"><code>&gt; overview hoge foo "hello world"
@@ -153,7 +157,9 @@ C:\path\to
 C:\path
 C:\path\to
 mruby code
+shell command on mruby : hi
 2 + 3 = 5
+shell command on nested mruby : hi!
 </code></pre>
         </section>
         
@@ -306,6 +312,7 @@ C:\path\to
 
         <section id="mruby" class="section box">
           <h2 class="title">mruby</h2>
+          <p><i>version 2.1.0</i></p>
           <p>mruby is run as gluecode.</p>
           <p>Write the mruby code between the code blocks <code>```ruby</code> and <code>```</code>, this code block can be written multiple times.</p>
           <p>There are also some missing features, there is implemented and called by Rust.</p>
@@ -315,25 +322,6 @@ C:\path\to
           <div class="content">
             <ul>
               <li><code>ARGV</code></li>
-              <li><code>STDIN</code>
-                <ul>
-                  <li><code>gets</code></li>
-                  <li><code>readline</code></li>
-                  <li><code>readlines</code></li>
-                </ul>
-              </li>
-              <li><code>STDOUT</code>
-                <ul>
-                  <li><code>puts</code></li>
-                  <li><code>print</code></li>
-                </ul>
-              </li>
-              <li><code>STDERR</code>
-                <ul>
-                  <li><code>puts</code></li>
-                  <li><code>print</code></li>
-                </ul>
-              </li>
               <li><code>Array</code>
                 <ul>
                   <li><code>to_cmd</code> <i>See below "Nested mruby"</i></li>
@@ -348,6 +336,16 @@ C:\path\to
           <code>to_cmd</code> and <code>from_cmd</code> implemented in <code>Array</code> are unique functions to exchange arrays with command prompt.<br>
           <code>to_cmd</code> converts an array into a command prompt argument list.<br>
           <code>from_cmd</code> converts the command prompt argument list into an array.<br>
+          <br>
+          mruby native:
+          <div class="content">
+            <ul>
+              <li><code>STDIN</code></li>
+              <li><code>STDOUT</code></li>
+              <li><code>STDERR</code></li>
+              <li>call shell command: <code>`echo from shell command`</code></li>
+            </ul>
+          </div>
 
           <br>
           For example: <code>mruby-sample</code> alias
@@ -363,10 +361,9 @@ echo 3 cmd
 </code><code class="language-ruby">```ruby
 puts '4 mruby'
 a = [].from_cmd %q( "hello world" foo bar 1 3.14 )
-# &lt;CRLF&gt;
 puts a
-# &lt;LF&gt;
-STDOUT.puts a
+STDERR.puts a
+puts `echo from shell command`
 ```</code><code class="language-bash">
 echo 5 cmd
 </code></pre>
@@ -380,6 +377,7 @@ gets=from_stdin
 4 mruby
 ["hello world", "foo", "bar", 1, 3.14]
 ["hello world", "foo", "bar", 1, 3.14]
+from shell command
 5 cmd
 </code></pre>
         </section>
@@ -404,6 +402,7 @@ a = [5, 'hello world', 7, 'foo', 'bar', 11]
 b = [5, 'hello world', 7, [['foo', 'bar'], 11]]
 ```</code><code class="language-bash">
 echo &lt;%= say_str %&gt;
+echo &lt;%= `echo world!` %&gt;
 echo 2 + 3 = &lt;%= 2 + &lt;%= 3 %&gt;%&gt;
 echo 3 + 5 = &lt;%= "3" + &lt;%= 5 %&gt;.to_s %&gt;
 echo &lt;%= a.to_cmd %&gt;
@@ -412,6 +411,7 @@ echo &lt;%= b.to_cmd_deep %&gt;
 
 <pre class="cmd"><code>&gt; nested-mruby-sample
 hello!
+world!
 2 + 3 = 5
 3 + 5 = 35
 5 "hello world" 7 foo bar 11
