@@ -11,4 +11,4 @@ clap = "2.33.0"
 encoding_rs = "0.8.22"
 termcolor = "1.1"
 atty = "0.2"
-mrusty = "*"
+mrusty = { git = "https://github.com/wordijp/mrusty" }

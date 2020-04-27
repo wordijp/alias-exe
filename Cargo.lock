@@ -49,6 +49,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
+name = "cc"
+version = "1.0.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95e28fa049fda1c330bcf9d723be7663a899c4679724b34c81e9f5a326aab8cd"
+
+[[package]]
 name = "cfg-if"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -91,12 +97,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gcc"
-version = "0.3.55"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
-
-[[package]]
 name = "hermit-abi"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -136,10 +136,9 @@ checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 [[package]]
 name = "mrusty"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f04d73bd310c21376b2dbfc0473c08a9e9f602e245e3de9a3ed02a46b8c31988"
+source = "git+https://github.com/wordijp/mrusty#531b52fc4a8ab00345e3e212907e18b1e7da36f2"
 dependencies = [
- "gcc",
+ "cc",
  "tar",
  "walkdir",
 ]

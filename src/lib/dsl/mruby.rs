@@ -22,7 +22,7 @@ pub fn mruby_new() -> Result<mrusty::MrubyType, mrusty::MrubyError> {
         mruby.run("ARGV = MrubyInitialize::ARGV")?;
     }
     {
-        setup_array_cmd_legacy(&mruby);
+        setup_array_cmd(&mruby);
 
         // array extension
         mruby.run(r#"
@@ -53,24 +53,6 @@ pub fn mruby_new() -> Result<mrusty::MrubyType, mrusty::MrubyError> {
         end
         "#)?;
     }
-    {
-        setup_stdin_legacy(&mruby);
-
-        // global STDIN object
-        mruby.run("STDIN = MrubyStdin.new")?;
-    }
-    {
-        setup_stdout_legacy(&mruby);
-
-        // global STDOUT object
-        mruby.run("STDOUT = MrubyStdout.new")?;
-    }
-    {
-        setup_stderr_legacy(&mruby);
-
-        // global STDERR object
-        mruby.run("STDERR = MrubyStderr.new")?;
-    }
 
     Ok(mruby)
 }
@@ -82,9 +64,7 @@ struct ArrayCmdDeep {
     value: mrusty::Value
 }
 
-// NOTE: warning: use of deprecated item 'std::mem::uninitialized': use `mem::MaybeUninit` instead
-#[allow(deprecated)]
-fn setup_array_cmd_legacy(mruby: &mrusty::MrubyType) {
+fn setup_array_cmd(mruby: &mrusty::MrubyType) {
     mrusty_class!(ArrayCmd, "MrubyArrayCmd", {
         def!("initialize", |v: Value| {
             ArrayCmd { value: v }
@@ -132,115 +112,6 @@ fn cmdstr2value(mruby: &mrusty::MrubyType, s: &str) -> Value {
     }
 
     mruby.string(s)
-}
-
-#[allow(deprecated)]
-fn setup_stdin_legacy(mruby: &mrusty::MrubyType) {
-    mruby_class!(mruby.clone(), "MrubyStdin", {
-        def!("gets", |mruby, _slf: Value| {
-            let mut s = String::new();
-            let size = io::stdin().read_line(&mut s);
-            if let Err(err) = size {
-                eprintln!("{}: in STDIN.gets: {}", term::ewrite("mruby failed").unwrap(), err);
-                process::exit(1);
-            }
-            if size.unwrap() == 0 {
-                return mruby.nil();
-            }
-
-            mruby.string(&s)
-        });
-
-        def!("readline", |mruby, _slf: Value| {
-            let mut s = String::new();
-            let size = io::stdin().read_line(&mut s);
-            if let Err(err) = size {
-                eprintln!("{}: in STDIN.readline: {}", term::ewrite("mruby failed").unwrap(), err);
-                process::exit(1);
-            }
-            if size.unwrap() == 0 {
-                eprintln!("{}: in STDIN.readline: end of file reached", term::ewrite("mruby failed").unwrap());
-                process::exit(1);
-            }
-
-            mruby.string(&s)
-        });
-
-        def!("readlines", |mruby, _slf: Value| {
-            let mut a = Vec::new();
-
-            let mut s = String::new();
-            loop {
-                let size = io::stdin().read_line(&mut s);
-                if let Err(err) = size {
-                    eprintln!("{}: in STDIN.readlines: {}", term::ewrite("mruby failed").unwrap(), err);
-                    process::exit(1);
-                }
-                if size.unwrap() == 0 {
-                    break;
-                }
-
-                a.push(mruby.string(&s));
-                s.clear();
-            }
-
-            mruby.array(a)
-        });
-    });
-}
-
-#[allow(deprecated)]
-fn setup_stdout_legacy(mruby: &mrusty::MrubyType) {
-    mruby_class!(mruby.clone(), "MrubyStdout", {
-        def!("puts", |mruby, _slf: Value, value: Value| {
-            let s = value2str(&mruby, value);
-            if let Err(err) = s {
-                eprintln!("{}: in STDOUT.puts: {}", term::ewrite("mruby failed").unwrap(), err);
-                process::exit(1);
-            }
-            println!("{}", s.unwrap());
-
-            mruby.nil()
-        });
-
-        def!("print", |mruby, _slf: Value, value: Value| {
-            let s = value2str(&mruby, value);
-            if let Err(err) = s {
-                eprintln!("{}: in STDOUT.print: {}", term::ewrite("mruby failed").unwrap(), err);
-                process::exit(1);
-            }
-            print!("{}", s.unwrap());
-
-            mruby.nil()
-        });
-    });
-}
-
-#[allow(deprecated)]
-fn setup_stderr_legacy(mruby: &mrusty::MrubyType) {
-    mruby_class!(mruby.clone(), "MrubyStderr", {
-        def!("puts", |mruby, _slf: Value, value: Value| {
-            let s = value2str(&mruby, value);
-            if let Err(err) = s {
-                eprintln!("{}: in STDERR.puts: {}", term::ewrite("mruby failed").unwrap(), err);
-                process::exit(1);
-            }
-            eprintln!("{}", s.unwrap());
-
-            mruby.nil()
-        });
-
-        def!("print", |mruby, _slf: Value, value: Value| {
-            let s = value2str(&mruby, value);
-            if let Err(err) = s {
-                eprintln!("{}: in STDERR.print: {}", term::ewrite("mruby failed").unwrap(), err);
-                process::exit(1);
-            }
-            eprint!("{}", s.unwrap());
-
-            mruby.nil()
-        });
-    });
 }
 
 enum MrubyValue {
