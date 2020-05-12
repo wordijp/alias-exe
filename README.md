@@ -30,7 +30,7 @@ Please check the help for details.
 ```
 
 When executed a symbolic link created by `alias edit <alias_name>`, it executes the command and mruby code.  
-The execution contents are saved as a txt file in the same directory as the symbolic link.
+The execution contents are saved as a txt file in the `%USERPROFILE%/.alias-exe/list` directory.
 
 ```cmd
 > alias edit hello
@@ -47,7 +47,10 @@ echo hello $(echo world)
 .
 ├── alias.exe
 └── list
-    ├── hello.exe -> ../alias.exe
+    └── hello.exe -> ../alias.exe
+	
+%USERPROFILE%/.alias-exe
+└── list
     └── hello.txt
 ```
 
