@@ -2,16 +2,15 @@ use std::{env, fs, path::Path};
 use std::io::{self, Read, Error, ErrorKind};
 use std::process::{Child, Command};
 
-use crate::lib::path;
+use crate::lib::path::{self, LISTDIR};
 use crate::lib::encode;
 use crate::lib::term;
-
-const LISTDIR: &str = "./list";
 
 // -----
 
 pub struct AliasListIterator {
-    dir: io::Result<fs::ReadDir>
+    dir: io::Result<fs::ReadDir>,
+    list_path: String
 }
 
 impl Iterator for AliasListIterator {
@@ -29,7 +28,7 @@ impl Iterator for AliasListIterator {
                                 .and_then(|x| x.to_str())
                                 .map(|x| x.to_string())
                                 .unwrap();
-                            let value = fs::read_to_string(format!("{}/{}.txt", LISTDIR, alias_name))
+                            let value = fs::read_to_string(format!("{}/{}.txt", self.list_path, alias_name))
                                 .map(|x| x.trim().to_string())
                                 .unwrap_or("".to_owned());
                             return Some((alias_name, value));
@@ -44,8 +43,49 @@ impl Iterator for AliasListIterator {
     }
 }
 
-pub fn iter() -> AliasListIterator {
-    AliasListIterator { dir: fs::read_dir(LISTDIR) }
+pub fn list_iter() -> io::Result<AliasListIterator> {
+    Ok(AliasListIterator { dir: fs::read_dir(LISTDIR), list_path: path::cfg_list_path()? })
+}
+
+// -----
+
+pub struct ConfigPathListIterator {
+    dir: io::Result<fs::ReadDir>,
+}
+
+impl Iterator for ConfigPathListIterator {
+    // type Item = (<alias_name>, <cfg_path>)
+    type Item = (String, String);
+
+    fn next(&mut self) -> Option<(String, String)> {
+        if let Ok(ref mut dir) = self.dir {
+            while let Some(entry) = dir.next() {
+                match entry {
+                    Ok(entry) => {
+                        let path = entry.path();
+                        if path::is_txt(&path) {
+                            let alias_name = path.file_stem()
+                                .and_then(|x| x.to_str())
+                                .map(|x| x.to_string())
+                                .unwrap();
+                            let path = path.to_str()
+                                .map(|x| x.to_owned())
+                                .unwrap();
+                            return Some((alias_name, path));
+                        }
+
+                    },
+                    Err(_) => break,
+                }
+            }
+        }
+
+        None
+    }
+}
+
+pub fn cfg_iter() -> io::Result<ConfigPathListIterator> {
+    Ok(ConfigPathListIterator { dir: fs::read_dir(path::cfg_list_path()?) })
 }
 
 // -----
@@ -65,11 +105,17 @@ pub fn validate(alias_name: &str) -> io::Result<()> {
 // -----
 
 pub fn edit(alias_name: &str) -> io::Result<()> {
-    if !Path::new(LISTDIR).exists() {
-        fs::create_dir(LISTDIR)?;
+    let cfg_path = path::cfg_path()?;
+    if !Path::new(&cfg_path).exists() {
+        fs::create_dir(&cfg_path)?;
+    }
+    
+    let cfg_list_path = path::cfg_list_path()?;
+    if !Path::new(&cfg_list_path).exists() {
+        fs::create_dir(&cfg_list_path)?;
     }
 
-    let alias_txt = format!("{}/{}.txt", LISTDIR, alias_name);
+    let alias_txt = format!("{}/{}.txt", &cfg_list_path, alias_name);
     if !Path::new(&alias_txt).exists() {
         fs::File::create(&alias_txt)?;
     }
@@ -108,7 +154,12 @@ pub fn mklink(alias_name: &str) -> io::Result<()> {
     let current_exe = env::current_exe().unwrap();
     let cwd_bak = env::current_dir().unwrap();
 
-    env::set_current_dir(&format!("{}/{}", current_exe.parent().unwrap().display(), LISTDIR)).expect(&format!("{}: change current dir", term::ewrite("failed")?));
+    let alias_list_path = format!("{}/{}", current_exe.parent().unwrap().display(), LISTDIR);
+    if !Path::new(&alias_list_path).exists() {
+        fs::create_dir(&alias_list_path)?;
+    }
+
+    env::set_current_dir(&alias_list_path).expect(&format!("{}: change current dir", term::ewrite("failed")?));
     // NOTE: mklink path separator is '\'
     let link = format!("{}.exe", alias_name);
     let target = format!("..\\{}", current_exe.file_name().unwrap().to_str().unwrap());
@@ -142,7 +193,7 @@ pub fn remove(alias_name: &str) -> io::Result<()> {
 
     fs::remove_file(&alias_exe)?;
 
-    let alias_txt = format!("{}/{}.txt", LISTDIR, alias_name);
+    let alias_txt = format!("{}/{}.txt", path::cfg_list_path()?, alias_name);
     if Path::new(&alias_txt).exists() {
         fs::remove_file(&alias_txt)?;
     }

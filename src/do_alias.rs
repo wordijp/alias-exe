@@ -36,6 +36,9 @@ fn try_run(args: &Vec<String>) -> io::Result<()> {
     if let Some(ref matches) = matches.subcommand_matches("list") {
         list(matches)?;
     }
+    if let Some(ref _matches) = matches.subcommand_matches("repair") {
+        repair()?;
+    }
 
     Ok(())
 }
@@ -59,15 +62,24 @@ fn remove(matches: &clap::ArgMatches<'static>) -> io::Result<()> {
 
 fn list(matches: &clap::ArgMatches<'static>) -> io::Result<()> {
     if matches.is_present("key") {
-        for (key, _value) in lib::alias::iter() {
+        for (key, _value) in lib::alias::list_iter()? {
             println!("{}", term::keywrite(&key)?);
         }
     } else {
-        for (key, value) in lib::alias::iter() {
+        for (key, value) in lib::alias::list_iter()? {
             print!("{}", term::keywrite(&key)?);
             println!(":\n{}", value);
         }
     }
+    Ok(())
+}
+
+fn repair() -> io::Result<()> {
+    for (key, _value) in lib::alias::cfg_iter()? {
+        lib::alias::mklink(&key)?;
+        println!("{} repaired", term::keywrite(&key)?);
+    }
+
     Ok(())
 }
 
@@ -80,7 +92,8 @@ SUBCOMMAND:
     help    Prints help information
     edit    Edit alias, new or existing
     remove  Remove alias
-    list    List aliases";
+    list    List aliases
+    repair  Repair aliases from .txt";
 
 const TEMPLATE: &str = "\
 {bin} {version}
@@ -109,6 +122,9 @@ fn clap_matches(args: &Vec<String>) -> clap::ArgMatches<'static> {
         .subcommand(
             SubCommand::with_name("list")
                 .arg(Arg::from_usage("-k --key 'List up only key'"))
+        )
+        .subcommand(
+            SubCommand::with_name("repair")
         )
         .get_matches_from(args)
 }
